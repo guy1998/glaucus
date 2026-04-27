@@ -218,14 +218,18 @@ def assign_ids(doc, doc_name: str, node_counter_start: int = 0, page_offset: int
         else:
             text = None
 
+        metadata = {
+            "page": adjusted_page,
+            "bbox": prov.bbox.model_dump() if prov else None,
+        }
+        if element_type == "section_header":
+            metadata["heading_level"] = getattr(element, "level", 2)
+
         node_data = {
             "id": node_id,
             "type": element_type,
             "text": text,
-            "metadata": {
-                "page": adjusted_page,
-                "bbox": prov.bbox.model_dump() if prov else None,
-            },
+            "metadata": metadata,
             "picture": picture_knowledge,
         }
         structured_nodes.append(node_data)
@@ -240,11 +244,78 @@ def assign_ids(doc, doc_name: str, node_counter_start: int = 0, page_offset: int
     return structured_nodes, node_counter
 
 
+def generate_markdown(nodes: list[dict]) -> str:
+    """
+    Build a Markdown document from structured nodes.
+    Each node is wrapped in an HTML span with its JSON id so the frontend
+    can scroll to or highlight any node by id.
+    Images are included as <img> tags using paths relative to OUTPUT_DIR.
+    """
+    _heading_prefix = {1: "#", 2: "##", 3: "###", 4: "####", 5: "#####", 6: "######"}
+    parts: list[str] = []
+
+    for node in nodes:
+        node_id = node["id"]
+        node_type = node["type"]
+        text = node.get("text") or ""
+        picture = node.get("picture")
+
+        anchor = f'<span id="{node_id}"></span>'
+
+        if node_type == "title":
+            parts.append(f"{anchor}\n# {text}")
+
+        elif node_type == "section_header":
+            level = node.get("metadata", {}).get("heading_level", 2)
+            prefix = _heading_prefix.get(level, "##")
+            parts.append(f"{anchor}\n{prefix} {text}")
+
+        elif node_type == "picture":
+            img_lines = [anchor]
+            if picture and picture.get("image_path"):
+                rel_path = f"images/{node_id}.png"
+                alt = (picture.get("description") or "").replace('"', "'")
+                img_lines.append(f'<img src="{rel_path}" alt="{alt}" />')
+            if picture and picture.get("description"):
+                img_lines.append(f"\n*{picture['description']}*")
+            parts.append("\n".join(img_lines))
+
+        elif node_type == "table":
+            parts.append(f"{anchor}\n{text}")
+
+        elif node_type == "list":
+            parts.append(f"{anchor}\n{text}")
+
+        elif node_type == "caption":
+            parts.append(f"{anchor}\n*{text}*")
+
+        elif node_type == "code":
+            parts.append(f"{anchor}\n```\n{text}\n```")
+
+        elif node_type == "formula":
+            parts.append(f"{anchor}\n$$\n{text}\n$$")
+
+        elif node_type in ("page_header", "page_footer", "footnote"):
+            parts.append(f"{anchor}\n<!-- {node_type}: {text} -->")
+
+        elif text:
+            parts.append(f"{anchor}\n{text}")
+
+    return "\n\n".join(parts)
+
+
 def save_document(doc_nodes, original_file):
     file_id = Path(original_file).stem
     output_file = OUTPUT_DIR / f"{file_id}.json"
     with open(output_file, "w", encoding="utf-8") as f:
         json.dump(doc_nodes, f, indent=2)
+
+
+def save_markdown(md_content: str, original_file):
+    file_id = Path(original_file).stem
+    output_file = OUTPUT_DIR / f"{file_id}.md"
+    with open(output_file, "w", encoding="utf-8") as f:
+        f.write(md_content)
 
 
 if __name__ == "__main__":
@@ -274,4 +345,6 @@ if __name__ == "__main__":
         shutil.rmtree(tmp_dir, ignore_errors=True)
 
     save_document(all_nodes, input_path)
-    print(f"Done. {len(all_nodes)} total nodes saved.")
+    md_content = generate_markdown(all_nodes)
+    save_markdown(md_content, input_path)
+    print(f"Done. {len(all_nodes)} total nodes saved. JSON + Markdown written to {OUTPUT_DIR}.")
