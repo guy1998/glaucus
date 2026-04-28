@@ -140,7 +140,7 @@ def build_edge_indexes(
 # Main
 # ---------------------------------------------------------------------------
 
-def embed_document(nodes_path: str) -> None:
+def embed_document(nodes_path: str, progress_fn=None) -> None:
     nodes_file  = Path(nodes_path)
     graph_file  = nodes_file.with_name(nodes_file.stem + "_graph.json")
     doc_id      = nodes_file.stem
@@ -191,7 +191,10 @@ def embed_document(nodes_path: str) -> None:
     print(f"Created collection '{collection}' at {QDRANT_PATH}")
 
     # ---------- Embed + upsert in batches ----------
-    for batch_start in tqdm(range(0, len(records), BATCH_SIZE), desc="Embedding batches"):
+    batch_ranges = range(0, len(records), BATCH_SIZE)
+    iterator = tqdm(batch_ranges, desc="Embedding batches") if progress_fn is None else batch_ranges
+
+    for batch_start in iterator:
         batch   = records[batch_start : batch_start + BATCH_SIZE]
         vectors = _embed(oai, [r[1] for r in batch])
 
@@ -218,6 +221,10 @@ def embed_document(nodes_path: str) -> None:
             points.append(PointStruct(id=point_uuid, vector=vector, payload=payload))
 
         qclient.upsert(collection_name=collection, points=points)
+
+        if progress_fn is not None:
+            done = min(batch_start + BATCH_SIZE, len(records))
+            progress_fn(done, len(records), f"Embedded {done}/{len(records)} nodes")
 
     print(f"\nDone. '{collection}' is ready — {len(records)} points in {QDRANT_PATH}")
 

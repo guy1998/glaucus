@@ -554,7 +554,7 @@ def build_page_index(nodes: list[dict]) -> dict[int, list[str]]:
 # Step 6 — Main edge builder
 # ---------------------------------------------------------------------------
 
-def build_reference_edges(nodes: list[dict]) -> list[dict]:
+def build_reference_edges(nodes: list[dict], progress_fn=None) -> list[dict]:
     node_map: dict[str, dict] = {n['id']: n for n in nodes}
     title_index = build_title_index(nodes)
     page_index = build_page_index(nodes)
@@ -574,6 +574,8 @@ def build_reference_edges(nodes: list[dict]) -> list[dict]:
             edges.append({'source': source_id, 'target': target_id, 'type': ref_type})
 
     for i, node in enumerate(nodes):
+        if progress_fn is not None and i % 25 == 0:
+            progress_fn(i, len(nodes), f"Scanning references {i}/{len(nodes)} nodes…")
         # --- Pre-filter ---
         if not has_potential_reference(node):
             continue
