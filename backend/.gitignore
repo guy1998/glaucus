@@ -1,7 +1,10 @@
 .env
 .venv
-_pycache__
+__pycache__
 
 test_data
 
 storage
+
+qdrant
+qdrant_storage

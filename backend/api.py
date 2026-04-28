@@ -33,7 +33,7 @@ from pathlib import Path
 from typing import Callable
 
 from dotenv import load_dotenv
-from flask import Flask, Response, jsonify, request, stream_with_context
+from flask import Flask, Response, jsonify, request, send_from_directory, stream_with_context
 from flask_cors import CORS
 from qdrant_client import QdrantClient
 
@@ -56,6 +56,9 @@ load_dotenv(Path(__file__).parent / ".env")
 
 QDRANT_PATH   = os.environ.get("QDRANT_PATH", "./qdrant_storage")
 MAX_UPLOAD_MB = int(os.environ.get("MAX_UPLOAD_MB", 200))
+OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+IMAGES_DIR = OUTPUT_DIR / "images"
+IMAGES_DIR.mkdir(parents=True, exist_ok=True)
 
 app = Flask(__name__)
 CORS(app)
@@ -208,6 +211,12 @@ def _run_pipeline(
 @app.get("/health")
 def health():
     return jsonify({"status": "ok"})
+
+
+@app.get("/documents/images/<path:filename>")
+def serve_image(filename: str):
+    images_dir = (Path(__file__).parent / "storage" / "documents" / "images").resolve()
+    return send_from_directory(str(images_dir), filename)
 
 
 @app.post("/documents/upload")

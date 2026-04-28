@@ -1,0 +1,81 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: #3f3f46 transparent;
+  }
+  *::-webkit-scrollbar        { width: 5px; height: 5px; }
+  *::-webkit-scrollbar-track  { background: transparent; }
+  *::-webkit-scrollbar-thumb  { background: #d4d4d8; border-radius: 3px; }
+  *::-webkit-scrollbar-thumb:hover { background: #D97706; }
+
+  body {
+    font-family: 'Inter', system-ui, sans-serif;
+    @apply bg-white text-zinc-900 antialiased;
+  }
+}
+
+@layer components {
+  /* ── Markdown rendering ─────────────────────────────────────────────────── */
+  .markdown-body {
+    @apply text-zinc-800 leading-7 text-[15px];
+  }
+  .markdown-body h1 {
+    @apply text-2xl font-bold text-zinc-900 mt-8 mb-4 pb-3 border-b border-zinc-200;
+  }
+  .markdown-body h2 {
+    @apply text-xl font-semibold text-zinc-900 mt-7 mb-3;
+  }
+  .markdown-body h3 {
+    @apply text-lg font-semibold text-gold-700 mt-5 mb-2;
+  }
+  .markdown-body h4,
+  .markdown-body h5,
+  .markdown-body h6 {
+    @apply text-base font-semibold text-gold-600 mt-4 mb-2;
+  }
+  .markdown-body p   { @apply mb-4; }
+  .markdown-body ul  { @apply list-disc  list-outside pl-5 mb-4 space-y-1; }
+  .markdown-body ol  { @apply list-decimal list-outside pl-5 mb-4 space-y-1; }
+  .markdown-body li  { @apply text-zinc-700; }
+  .markdown-body blockquote {
+    @apply border-l-4 border-gold-400 pl-4 text-zinc-500 italic my-4 bg-gold-50 py-2 rounded-r-md;
+  }
+  .markdown-body code {
+    @apply bg-zinc-100 text-gold-700 px-1.5 py-0.5 rounded text-sm font-mono;
+  }
+  .markdown-body pre {
+    @apply bg-zinc-900 text-zinc-100 p-4 rounded-xl overflow-x-auto mb-4 text-sm;
+  }
+  .markdown-body pre code {
+    @apply bg-transparent text-zinc-100 p-0;
+  }
+  .markdown-body table {
+    @apply w-full border-collapse mb-4 text-sm;
+  }
+  .markdown-body th {
+    @apply border border-zinc-200 bg-gold-50 px-3 py-2 text-left text-gold-800 font-semibold;
+  }
+  .markdown-body td {
+    @apply border border-zinc-200 px-3 py-2 text-zinc-700;
+  }
+  .markdown-body tr:nth-child(even) td {
+    @apply bg-zinc-50;
+  }
+  .markdown-body img {
+    @apply max-w-full rounded-xl my-6 border border-zinc-200 shadow-sm;
+  }
+  .markdown-body a {
+    @apply text-gold-600 hover:text-gold-500 underline underline-offset-2 transition-colors;
+  }
+  .markdown-body hr { @apply border-zinc-200 my-8; }
+
+  /* Node highlight when navigated from JSON tree */
+  .node-active {
+    @apply bg-gold-50 rounded-md outline outline-2 outline-gold-300 outline-offset-2;
+    transition: background 0.4s ease, outline-color 0.4s ease;
+  }
+}
