@@ -13,7 +13,7 @@ import tempfile
 
 load_dotenv(Path(__file__).parent / ".env")
 
-INPUT_FILE = "../Graph extraction/SPC-50S-SPC75-Close-Coupled-Pulper.pdf"
+INPUT_FILE = "./test_data/SPC-50S-SPC75-Close-Coupled-Pulper.pdf"
 OUTPUT_DIR = Path("storage/documents")
 IMAGES_DIR = OUTPUT_DIR / "images"
 PAGES_PER_CHUNK = 10
