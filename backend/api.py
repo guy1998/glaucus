@@ -25,6 +25,7 @@ SSE event shape (all events share the same data channel):
   {"type": "error",     "message": "…"}
 """
 
+import datetime
 import json
 import os
 import queue
@@ -70,6 +71,26 @@ _jobs: dict[str, dict] = {}
 
 # Qdrant's local storage is not safe for concurrent writes; serialize them.
 _write_lock = threading.Lock()
+
+# ---------------------------------------------------------------------------
+# Data sources storage
+# ---------------------------------------------------------------------------
+
+DATA_SOURCES_FILE = Path(__file__).parent / "storage" / "data_sources.json"
+_data_sources_lock = threading.Lock()
+
+
+def _load_data_sources() -> dict:
+    if not DATA_SOURCES_FILE.exists():
+        return {"sources": [], "assignments": {}}
+    with open(DATA_SOURCES_FILE, encoding="utf-8") as f:
+        return json.load(f)
+
+
+def _save_data_sources(data: dict) -> None:
+    DATA_SOURCES_FILE.parent.mkdir(parents=True, exist_ok=True)
+    with open(DATA_SOURCES_FILE, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=2, ensure_ascii=False)
 
 
 # ---------------------------------------------------------------------------
@@ -460,6 +481,90 @@ def delete_document(doc_id: str):
         client.delete_collection(collection)
 
     return jsonify({"deleted": doc_id})
+
+
+# ---------------------------------------------------------------------------
+# Data source routes
+# ---------------------------------------------------------------------------
+
+@app.get("/data-sources")
+def list_data_sources():
+    with _data_sources_lock:
+        return jsonify(_load_data_sources())
+
+
+@app.post("/data-sources")
+def create_data_source():
+    body = request.get_json(force=True, silent=True) or {}
+    name = (body.get("name") or "").strip()
+    if not name:
+        return jsonify({"error": "'name' is required"}), 400
+
+    source = {
+        "id": f"ds_{uuid.uuid4().hex[:12]}",
+        "name": name,
+        "created_at": datetime.datetime.utcnow().isoformat(),
+    }
+
+    with _data_sources_lock:
+        data = _load_data_sources()
+        data["sources"].append(source)
+        _save_data_sources(data)
+
+    return jsonify({"source": source}), 201
+
+
+@app.patch("/data-sources/<source_id>")
+def rename_data_source(source_id: str):
+    body = request.get_json(force=True, silent=True) or {}
+    name = (body.get("name") or "").strip()
+    if not name:
+        return jsonify({"error": "'name' is required"}), 400
+
+    with _data_sources_lock:
+        data = _load_data_sources()
+        source = next((s for s in data["sources"] if s["id"] == source_id), None)
+        if not source:
+            return jsonify({"error": f"data source '{source_id}' not found"}), 404
+        source["name"] = name
+        _save_data_sources(data)
+
+    return jsonify({"source": source})
+
+
+@app.delete("/data-sources/<source_id>")
+def delete_data_source(source_id: str):
+    with _data_sources_lock:
+        data = _load_data_sources()
+        if not any(s["id"] == source_id for s in data["sources"]):
+            return jsonify({"error": f"data source '{source_id}' not found"}), 404
+        data["sources"] = [s for s in data["sources"] if s["id"] != source_id]
+        data["assignments"] = {
+            doc_id: sid
+            for doc_id, sid in data["assignments"].items()
+            if sid != source_id
+        }
+        _save_data_sources(data)
+
+    return jsonify({"deleted": source_id})
+
+
+@app.put("/documents/<doc_id>/data-source")
+def assign_document_data_source(doc_id: str):
+    body = request.get_json(force=True, silent=True) or {}
+    source_id = body.get("source_id")  # None to unassign
+
+    with _data_sources_lock:
+        data = _load_data_sources()
+        if source_id is not None and not any(s["id"] == source_id for s in data["sources"]):
+            return jsonify({"error": f"data source '{source_id}' not found"}), 404
+        if source_id is None:
+            data["assignments"].pop(doc_id, None)
+        else:
+            data["assignments"][doc_id] = source_id
+        _save_data_sources(data)
+
+    return jsonify({"doc_id": doc_id, "source_id": source_id})
 
 
 # ---------------------------------------------------------------------------

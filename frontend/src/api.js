@@ -72,3 +72,45 @@ export function openStream(jobId) {
 export function imageUrl(nodeId) {
   return `${BASE}/documents/images/${nodeId}.png`
 }
+
+export async function listDataSources() {
+  const res = await fetch(`${BASE}/data-sources`)
+  if (!res.ok) throw new Error('Failed to list data sources')
+  return res.json()
+}
+
+export async function createDataSource(name) {
+  const res = await fetch(`${BASE}/data-sources`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name }),
+  })
+  if (!res.ok) throw new Error('Failed to create data source')
+  return res.json()
+}
+
+export async function renameDataSource(sourceId, name) {
+  const res = await fetch(`${BASE}/data-sources/${encodeURIComponent(sourceId)}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name }),
+  })
+  if (!res.ok) throw new Error('Failed to rename data source')
+  return res.json()
+}
+
+export async function deleteDataSource(sourceId) {
+  const res = await fetch(`${BASE}/data-sources/${encodeURIComponent(sourceId)}`, { method: 'DELETE' })
+  if (!res.ok) throw new Error('Failed to delete data source')
+  return res.json()
+}
+
+export async function assignDocToDataSource(docId, sourceId) {
+  const res = await fetch(`${BASE}/documents/${encodeURIComponent(docId)}/data-source`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ source_id: sourceId }),
+  })
+  if (!res.ok) throw new Error('Failed to assign data source')
+  return res.json()
+}
