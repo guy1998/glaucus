@@ -101,6 +101,7 @@ export default function DocumentPage() {
         {treeOpen && (
           <div className="w-80 xl:w-96 flex-shrink-0 overflow-hidden transition-all duration-200 animate-slide-down">
             <JsonTree
+              docId={docId}
               nodes={doc?.nodes}
               activeNodeId={activeNodeId}
               onNodeClick={handleNodeClick}

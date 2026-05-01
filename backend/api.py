@@ -7,8 +7,11 @@ Endpoints:
   GET  /documents                                  List all indexed documents
   GET  /documents/<doc_id>                         Return markdown + JSON nodes for a document
   POST /documents/<doc_id>/query                   Semantic search over a document
-  GET  /documents/<doc_id>/nodes/<node_id>/source  Return page-scoped markdown for a node's source page
-  DELETE /documents/<doc_id>                       Remove a collection from Qdrant
+  GET  /documents/<doc_id>/nodes/<node_id>/source        Return page-scoped markdown for a node's source page
+  GET  /documents/<doc_id>/nodes/<node_id>/connections  Return outgoing/incoming edges for a node
+  POST /documents/<doc_id>/edges                        Add an edge {source, target, type}
+  DELETE /documents/<doc_id>/edges                      Remove an edge {source, target}
+  DELETE /documents/<doc_id>                            Remove a collection from Qdrant
   GET  /health                                     Health check
 
 Start:
@@ -90,6 +93,20 @@ def _load_doc_markdown(doc_id: str) -> str | None:
     if not path.exists():
         return None
     return path.read_text(encoding="utf-8")
+
+
+def _load_doc_graph(doc_id: str) -> dict | None:
+    path = OUTPUT_DIR / f"{doc_id}_graph.json"
+    if not path.exists():
+        return None
+    with open(path, encoding="utf-8") as f:
+        return json.load(f)
+
+
+def _save_doc_graph(doc_id: str, graph: dict) -> None:
+    path = OUTPUT_DIR / f"{doc_id}_graph.json"
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(graph, f, indent=2, ensure_ascii=False)
 
 
 # ---------------------------------------------------------------------------
@@ -354,6 +371,82 @@ def query_document(doc_id: str):
     context = format_context_for_llm(nodes)
 
     return jsonify({"query": q_text, "nodes": nodes, "context": context})
+
+
+@app.get("/documents/<doc_id>/nodes/<node_id>/connections")
+def node_connections(doc_id: str, node_id: str):
+    nodes = _load_doc_nodes(doc_id)
+    if nodes is None:
+        return jsonify({"error": f"document '{doc_id}' not found"}), 404
+
+    graph = _load_doc_graph(doc_id)
+    edges = graph.get("edges", []) if graph else []
+    node_map = {n["id"]: n for n in nodes}
+
+    def node_summary(nid: str) -> dict:
+        n = node_map.get(nid)
+        if not n:
+            return {"id": nid, "type": None, "page": None, "preview": ""}
+        text = n.get("text") or (n.get("picture") or {}).get("description") or ""
+        return {
+            "id": nid,
+            "type": n.get("type"),
+            "page": (n.get("metadata") or {}).get("page"),
+            "preview": text.replace("\n", " ")[:90],
+        }
+
+    outgoing = [{"edge_type": e["type"], "node": node_summary(e["target"])} for e in edges if e["source"] == node_id]
+    incoming = [{"edge_type": e["type"], "node": node_summary(e["source"])} for e in edges if e["target"] == node_id]
+
+    return jsonify({"node_id": node_id, "outgoing": outgoing, "incoming": incoming})
+
+
+@app.post("/documents/<doc_id>/edges")
+def add_edge(doc_id: str):
+    body   = request.get_json(force=True, silent=True) or {}
+    source = (body.get("source") or "").strip()
+    target = (body.get("target") or "").strip()
+    etype  = (body.get("type") or "explicit").strip()
+
+    if not source or not target:
+        return jsonify({"error": "'source' and 'target' are required"}), 400
+    if source == target:
+        return jsonify({"error": "source and target must differ"}), 400
+
+    graph = _load_doc_graph(doc_id)
+    if graph is None:
+        return jsonify({"error": f"graph for '{doc_id}' not found"}), 404
+
+    edges = graph.get("edges", [])
+    if any(e["source"] == source and e["target"] == target for e in edges):
+        return jsonify({"message": "edge already exists"}), 200
+
+    edges.append({"source": source, "target": target, "type": etype})
+    graph["edges"] = edges
+    _save_doc_graph(doc_id, graph)
+    return jsonify({"added": {"source": source, "target": target, "type": etype}}), 201
+
+
+@app.delete("/documents/<doc_id>/edges")
+def remove_edge(doc_id: str):
+    body   = request.get_json(force=True, silent=True) or {}
+    source = (body.get("source") or "").strip()
+    target = (body.get("target") or "").strip()
+
+    if not source or not target:
+        return jsonify({"error": "'source' and 'target' are required"}), 400
+
+    graph = _load_doc_graph(doc_id)
+    if graph is None:
+        return jsonify({"error": f"graph for '{doc_id}' not found"}), 404
+
+    before = len(graph.get("edges", []))
+    graph["edges"] = [e for e in graph.get("edges", []) if not (e["source"] == source and e["target"] == target)]
+    if len(graph["edges"]) == before:
+        return jsonify({"error": "edge not found"}), 404
+
+    _save_doc_graph(doc_id, graph)
+    return jsonify({"removed": {"source": source, "target": target}})
 
 
 @app.delete("/documents/<doc_id>")

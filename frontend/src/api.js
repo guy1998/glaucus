@@ -39,6 +39,32 @@ export async function deleteDocument(docId) {
   return res.json()
 }
 
+export async function getNodeConnections(docId, nodeId) {
+  const res = await fetch(`${BASE}/documents/${encodeURIComponent(docId)}/nodes/${encodeURIComponent(nodeId)}/connections`)
+  if (!res.ok) throw new Error('Failed to load connections')
+  return res.json()
+}
+
+export async function addEdge(docId, source, target, type = 'explicit') {
+  const res = await fetch(`${BASE}/documents/${encodeURIComponent(docId)}/edges`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ source, target, type }),
+  })
+  if (!res.ok) throw new Error('Failed to add edge')
+  return res.json()
+}
+
+export async function removeEdge(docId, source, target) {
+  const res = await fetch(`${BASE}/documents/${encodeURIComponent(docId)}/edges`, {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ source, target }),
+  })
+  if (!res.ok) throw new Error('Failed to remove edge')
+  return res.json()
+}
+
 export function openStream(jobId) {
   return new EventSource(`${BASE}/documents/stream/${jobId}`)
 }
