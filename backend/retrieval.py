@@ -33,6 +33,8 @@ from dotenv import load_dotenv
 from openai import OpenAI
 from qdrant_client import QdrantClient
 
+from qdrant_shared import get_qdrant
+
 load_dotenv(Path(__file__).parent / ".env")
 
 EMBEDDING_BASE  = (os.environ.get("EMBEDDING_BASE_URL") or os.environ.get("VLM_BASE_URL", "")).rstrip("/")
@@ -50,8 +52,7 @@ EXPLICIT_EDGE_TYPES = {"explicit", "explicit_page"}
 # Shared clients (lazy-initialised singletons)
 # ---------------------------------------------------------------------------
 
-_oai_client:    OpenAI | None      = None
-_qdrant_client: QdrantClient | None = None
+_oai_client: OpenAI | None = None
 
 
 def _oai() -> OpenAI:
@@ -67,10 +68,7 @@ def _oai() -> OpenAI:
 
 
 def _qdrant() -> QdrantClient:
-    global _qdrant_client
-    if _qdrant_client is None:
-        _qdrant_client = QdrantClient(path=QDRANT_PATH)
-    return _qdrant_client
+    return get_qdrant()
 
 
 def _stable_uuid(node_id: str) -> str:

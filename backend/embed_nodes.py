@@ -23,9 +23,10 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 from openai import OpenAI
-from qdrant_client import QdrantClient
 from qdrant_client.models import Distance, VectorParams, PointStruct
 from tqdm import tqdm
+
+from qdrant_shared import get_qdrant
 
 load_dotenv(Path(__file__).parent / ".env")
 
@@ -178,7 +179,7 @@ def embed_document(nodes_path: str, progress_fn=None) -> None:
     print(f"Embedding dim detected: {dim}")
 
     # ---------- Qdrant collection setup ----------
-    qclient = QdrantClient(path=QDRANT_PATH)
+    qclient = get_qdrant()
 
     if qclient.collection_exists(collection):
         qclient.delete_collection(collection)
