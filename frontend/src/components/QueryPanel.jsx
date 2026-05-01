@@ -12,7 +12,7 @@ function ScoreBadge({ score }) {
   )
 }
 
-export default function QueryPanel({ docId, onClose, onNodeClick }) {
+export default function QueryPanel({ docId, onClose, onNodeClick, activeNodeId }) {
   const [query, setQuery] = useState('')
   const [results, setResults] = useState(null)
   const [loading, setLoading] = useState(false)
@@ -42,7 +42,6 @@ export default function QueryPanel({ docId, onClose, onNodeClick }) {
 
   function handleNodeClick(nodeId) {
     onNodeClick(nodeId)
-    onClose()
   }
 
   return (
@@ -106,9 +105,13 @@ export default function QueryPanel({ docId, onClose, onNodeClick }) {
           <div className="divide-y divide-zinc-100">
             {results.map((node, i) => (
               <button
-                key={node.id ?? i}
-                onClick={() => handleNodeClick(node.id)}
-                className="w-full flex items-start gap-4 px-6 py-4 text-left hover:bg-gold-50 transition-colors group"
+                key={node.node_id ?? i}
+                onClick={() => handleNodeClick(node.node_id)}
+                className={`w-full flex items-start gap-4 px-6 py-4 text-left transition-colors group ${
+                  activeNodeId === node.node_id
+                    ? 'bg-gold-50 border-l-2 border-gold-400'
+                    : 'hover:bg-gold-50'
+                }`}
               >
                 <div className="flex-shrink-0 w-7 h-7 rounded-lg bg-gold-100 flex items-center justify-center">
                   <FileText className="w-3.5 h-3.5 text-gold-600" />
@@ -116,15 +119,15 @@ export default function QueryPanel({ docId, onClose, onNodeClick }) {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1">
                     <span className="text-[11px] font-medium text-zinc-400 uppercase tracking-wide">
-                      {node.type?.replace('_', ' ')}
+                      {node.node_type?.replace('_', ' ')}
                     </span>
-                    {node.metadata?.page != null && (
-                      <span className="text-[11px] text-zinc-300">· p.{node.metadata.page}</span>
+                    {node.page != null && (
+                      <span className="text-[11px] text-zinc-300">· p.{node.page}</span>
                     )}
                     {node.score != null && <ScoreBadge score={node.score} />}
                   </div>
                   <p className="text-sm text-zinc-700 line-clamp-3 leading-relaxed">
-                    {(node.text || node.picture?.description || '').replace(/\s+/g, ' ')}
+                    {(node.text || node.picture_desc || '').replace(/\s+/g, ' ')}
                   </p>
                 </div>
                 <ChevronRight className="w-4 h-4 text-zinc-300 group-hover:text-gold-400 flex-shrink-0 mt-1 transition-colors" />

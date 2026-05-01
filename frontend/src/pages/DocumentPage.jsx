@@ -115,6 +115,7 @@ export default function DocumentPage() {
           docId={docId}
           onClose={() => setQueryOpen(false)}
           onNodeClick={handleNodeClick}
+          activeNodeId={activeNodeId}
         />
       )}
     </div>
