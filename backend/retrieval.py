@@ -136,12 +136,12 @@ def retrieve_context(
     vector  = embed_query(query)
 
     # 1. Dense search
-    hits = qclient.search(
+    hits = qclient.query_points(
         collection_name=collection,
-        query_vector=vector,
+        query=vector,
         limit=top_k,
         with_payload=True,
-    )
+    ).points
 
     # scored: node_id -> (score, source)
     scored: dict[str, tuple[float, str]] = {}

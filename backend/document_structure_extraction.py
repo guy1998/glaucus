@@ -14,7 +14,7 @@ import tempfile
 load_dotenv(Path(__file__).parent / ".env")
 
 INPUT_FILE = "./test_data/SPC-50S-SPC75-Close-Coupled-Pulper.pdf"
-OUTPUT_DIR = Path("storage/documents")
+OUTPUT_DIR = Path(__file__).parent / "storage" / "documents"
 IMAGES_DIR = OUTPUT_DIR / "images"
 PAGES_PER_CHUNK = 10
 
@@ -92,8 +92,17 @@ def _extract_picture_knowledge(element: PictureItem, doc, node_id: str) -> dict:
     for ann in element.annotations:
         if isinstance(ann, DescriptionAnnotation):
             raw = ann.text or ""
+            # Strip markdown code fences that some VLMs wrap around JSON responses
+            candidate = raw.strip()
+            if candidate.startswith("```"):
+                lines = candidate.splitlines()
+                end = len(lines) - 1
+                while end > 0 and not lines[end].strip():
+                    end -= 1
+                if lines[end].strip() == "```":
+                    candidate = "\n".join(lines[1:end]).strip()
             try:
-                parsed = json.loads(raw)
+                parsed = json.loads(candidate)
                 description = parsed.get("description")
                 references = parsed.get("references", [])
                 if not isinstance(references, list):
@@ -274,10 +283,14 @@ def generate_markdown(nodes: list[dict]) -> str:
             img_lines = [anchor]
             if picture and picture.get("image_path"):
                 rel_path = f"images/{node_id}.png"
-                alt = (picture.get("description") or "").replace('"', "'")
+                desc = picture.get("description") or ""
+                # Collapse to single line so the alt attribute and italic caption stay valid markdown
+                alt = " ".join(desc.splitlines()).replace('"', "'")
                 img_lines.append(f'<img src="{rel_path}" alt="{alt}" />')
             if picture and picture.get("description"):
-                img_lines.append(f"\n*{picture['description']}*")
+                desc = picture["description"]
+                caption = " ".join(desc.splitlines())
+                img_lines.append(f"\n*{caption}*")
             parts.append("\n".join(img_lines))
 
         elif node_type == "table":

@@ -35,10 +35,9 @@ from typing import Callable
 from dotenv import load_dotenv
 from flask import Flask, Response, jsonify, request, send_from_directory, stream_with_context
 from flask_cors import CORS
-from qdrant_client import QdrantClient
-
 from document_structure_extraction import (
     OUTPUT_DIR,
+    IMAGES_DIR,
     PAGES_PER_CHUNK,
     assign_ids,
     generate_markdown,
@@ -50,15 +49,11 @@ from document_structure_extraction import (
 
 from embed_nodes import embed_document
 from reference_graph_builder import build_reference_edges, save_graph
-from retrieval import format_context_for_llm, retrieve_context
+from retrieval import _qdrant, format_context_for_llm, retrieve_context
 
 load_dotenv(Path(__file__).parent / ".env")
 
-QDRANT_PATH   = os.environ.get("QDRANT_PATH", "./qdrant_storage")
 MAX_UPLOAD_MB = int(os.environ.get("MAX_UPLOAD_MB", 200))
-OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-IMAGES_DIR = OUTPUT_DIR / "images"
-IMAGES_DIR.mkdir(parents=True, exist_ok=True)
 
 app = Flask(__name__)
 CORS(app)
@@ -77,10 +72,6 @@ _write_lock = threading.Lock()
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
-
-def _qdrant() -> QdrantClient:
-    return QdrantClient(path=QDRANT_PATH)
-
 
 def _doc_id(filename: str) -> str:
     return Path(filename).stem
@@ -215,8 +206,7 @@ def health():
 
 @app.get("/documents/images/<path:filename>")
 def serve_image(filename: str):
-    images_dir = (Path(__file__).parent / "storage" / "documents" / "images").resolve()
-    return send_from_directory(str(images_dir), filename)
+    return send_from_directory(str(IMAGES_DIR), filename)
 
 
 @app.post("/documents/upload")

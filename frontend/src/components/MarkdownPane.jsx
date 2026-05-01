@@ -3,13 +3,12 @@ import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import rehypeRaw from 'rehype-raw'
 
-function resolveImageSrc(src) {
-  if (!src) return src
-  if (src.startsWith('images/')) {
-    const filename = src.slice('images/'.length)
-    return `/api/documents/images/${filename}`
-  }
-  return src
+const API_IMAGES = '/api/documents/images'
+
+// Rewrite relative `images/` srcs at the string level so both raw-HTML <img>
+// tags (rendered by rehypeRaw) and markdown image syntax get the correct URL.
+function rewriteImageSrcs(md) {
+  return md.replace(/src="images\//g, `src="${API_IMAGES}/`)
 }
 
 export default function MarkdownPane({ markdown, activeNodeId }) {
@@ -31,7 +30,7 @@ export default function MarkdownPane({ markdown, activeNodeId }) {
     img({ src, alt, ...props }) {
       return (
         <img
-          src={resolveImageSrc(src)}
+          src={src}
           alt={alt}
           loading="lazy"
           className="max-w-full rounded-xl my-6 border border-zinc-200 shadow-sm"
@@ -65,7 +64,7 @@ export default function MarkdownPane({ markdown, activeNodeId }) {
             rehypePlugins={[rehypeRaw]}
             components={components}
           >
-            {markdown}
+            {rewriteImageSrcs(markdown)}
           </ReactMarkdown>
         </div>
       </div>
