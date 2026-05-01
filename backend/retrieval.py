@@ -1,5 +1,5 @@
 """
-retrieval.py — Query the Glaucus RAG pipeline.
+retrieval.py — Query the Glaucias RAG pipeline.
 
 Usage (CLI):
     python retrieval.py doc_MyDoc "What is the maximum operating pressure?"

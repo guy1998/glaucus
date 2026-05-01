@@ -1,5 +1,5 @@
 """
-api.py — Flask REST API for the Glaucus document RAG pipeline.
+api.py — Flask REST API for the Glaucias document RAG pipeline.
 
 Endpoints:
   POST /documents/upload                           Upload a PDF; returns {job_id, stream_url}
@@ -54,6 +54,7 @@ from document_structure_extraction import (
 from embed_nodes import embed_document
 from reference_graph_builder import build_reference_edges, save_graph
 from retrieval import _qdrant, format_context_for_llm, retrieve_context
+import chat_retrieval as _cr
 
 load_dotenv(Path(__file__).parent / ".env")
 
@@ -503,6 +504,7 @@ def create_data_source():
     source = {
         "id": f"ds_{uuid.uuid4().hex[:12]}",
         "name": name,
+        "description": (body.get("description") or "").strip() or None,
         "created_at": datetime.datetime.utcnow().isoformat(),
     }
 
@@ -515,18 +517,24 @@ def create_data_source():
 
 
 @app.patch("/data-sources/<source_id>")
-def rename_data_source(source_id: str):
+def update_data_source(source_id: str):
     body = request.get_json(force=True, silent=True) or {}
-    name = (body.get("name") or "").strip()
-    if not name:
-        return jsonify({"error": "'name' is required"}), 400
+    name = (body.get("name") or "").strip() or None
+    has_description = "description" in body
+    description = (body.get("description") or "").strip() or None
+
+    if name is None and not has_description:
+        return jsonify({"error": "at least 'name' or 'description' is required"}), 400
 
     with _data_sources_lock:
         data = _load_data_sources()
         source = next((s for s in data["sources"] if s["id"] == source_id), None)
         if not source:
             return jsonify({"error": f"data source '{source_id}' not found"}), 404
-        source["name"] = name
+        if name is not None:
+            source["name"] = name
+        if has_description:
+            source["description"] = description
         _save_data_sources(data)
 
     return jsonify({"source": source})
@@ -565,6 +573,111 @@ def assign_document_data_source(doc_id: str):
         _save_data_sources(data)
 
     return jsonify({"doc_id": doc_id, "source_id": source_id})
+
+
+# ---------------------------------------------------------------------------
+# Chat stream route
+# ---------------------------------------------------------------------------
+
+@app.post("/chat/stream")
+def chat_stream():
+    body      = request.get_json(force=True, silent=True) or {}
+    query     = (body.get("query") or "").strip()
+    source_id = body.get("data_source_id")   # None / "auto" → auto-route
+    history   = body.get("history") or []    # [{role, content}, …]
+
+    if not query:
+        return jsonify({"error": "'query' is required"}), 400
+
+    def generate():
+        try:
+            with _data_sources_lock:
+                ds_data = _load_data_sources()
+            all_sources  = ds_data["sources"]
+            assignments  = ds_data["assignments"]
+
+            # ── 1. Route ────────────────────────────────────────────────────
+            chosen_source = None
+            if not source_id or source_id == "auto":
+                # Only consider sources that have at least one indexed document
+                candidates = []
+                for s in all_sources:
+                    doc_ids = [did for did, sid in assignments.items() if sid == s["id"]]
+                    if any(_qdrant().collection_exists(f"doc_{did}") for did in doc_ids):
+                        candidates.append(s)
+                if candidates:
+                    cid = _cr.route_to_data_source(query, candidates)
+                    chosen_source = next((s for s in all_sources if s["id"] == cid), None)
+            else:
+                chosen_source = next((s for s in all_sources if s["id"] == source_id), None)
+
+            if chosen_source:
+                yield f"data: {json.dumps({'type': 'routing', 'source': {'id': chosen_source['id'], 'name': chosen_source['name']}})}\n\n"
+
+            # ── 2. Expand query ──────────────────────────────────────────────
+            queries, keywords = _cr.expand_query(query)
+            yield f"data: {json.dumps({'type': 'queries', 'queries': queries})}\n\n"
+            if keywords:
+                yield f"data: {json.dumps({'type': 'keywords', 'keywords': keywords})}\n\n"
+
+            # ── 3. Determine collections to search ──────────────────────────
+            if chosen_source:
+                doc_ids = [did for did, sid in assignments.items() if sid == chosen_source["id"]]
+            else:
+                # No routable source → search everything indexed
+                try:
+                    cols = _qdrant().get_collections().collections
+                    doc_ids = [c.name.removeprefix("doc_") for c in cols if c.name.startswith("doc_")]
+                except Exception:
+                    doc_ids = list(assignments.keys())
+
+            collections = [f"doc_{did}" for did in doc_ids]
+
+            if not collections:
+                yield f"data: {json.dumps({'type': 'error', 'message': 'No indexed documents found in this data source.'})}\n\n"
+                return
+
+            # ── 4. Retrieve ──────────────────────────────────────────────────
+            nodes = _cr.retrieve_from_collections(queries, collections)
+
+            node_summary = [
+                {
+                    "node_id":      n.get("node_id"),
+                    "node_type":    n.get("node_type"),
+                    "page":         n.get("page"),
+                    "text":         (n.get("text") or "")[:300],
+                    "parent_header": n.get("parent_header"),
+                    "score":        n.get("score"),
+                    "source":       n.get("source"),
+                    "collection":   n.get("collection", ""),
+                }
+                for n in nodes
+            ]
+            yield f"data: {json.dumps({'type': 'sources', 'nodes': node_summary})}\n\n"
+
+            # ── 5. Stream LLM answer ─────────────────────────────────────────
+            llm_history = [
+                {"role": m["role"], "content": m["content"]}
+                for m in history
+                if m.get("role") in ("user", "assistant") and m.get("content")
+            ]
+            for token in _cr.stream_response(query, nodes, llm_history):
+                yield f"data: {json.dumps({'type': 'token', 'text': token})}\n\n"
+
+            yield f"data: {json.dumps({'type': 'complete'})}\n\n"
+
+        except Exception as exc:
+            yield f"data: {json.dumps({'type': 'error', 'message': str(exc)})}\n\n"
+
+    return Response(
+        stream_with_context(generate()),
+        mimetype="text/event-stream",
+        headers={
+            "Cache-Control":     "no-cache",
+            "X-Accel-Buffering": "no",
+            "Connection":        "keep-alive",
+        },
+    )
 
 
 # ---------------------------------------------------------------------------

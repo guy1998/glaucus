@@ -1,18 +1,21 @@
 import { useState, useEffect, useRef } from 'react'
-import { Link, useParams, useNavigate } from 'react-router-dom'
+import { Link, useParams, useNavigate, useLocation } from 'react-router-dom'
 import {
   FileText, Plus, Trash2, Loader2, Pencil, Check, X,
   FolderOpen, Folder, ChevronRight, ChevronDown, FolderInput,
+  MessageSquare, AlignLeft,
 } from 'lucide-react'
 import {
   listDocuments, deleteDocument,
   listDataSources, createDataSource, renameDataSource,
-  deleteDataSource, assignDocToDataSource,
+  deleteDataSource, assignDocToDataSource, updateDataSourceDescription,
 } from '../api'
 
 export default function Sidebar({ onUpload, refreshKey }) {
   const { docId } = useParams()
   const navigate = useNavigate()
+  const location = useLocation()
+  const onChatPage = location.pathname === '/chat'
 
   const [docs, setDocs] = useState([])
   const [sources, setSources] = useState([])
@@ -38,6 +41,11 @@ export default function Sidebar({ onUpload, refreshKey }) {
   // Collapsed data source sections
   const [collapsedSources, setCollapsedSources] = useState({})
 
+  // Description editing (inline, per source)
+  const [editingDescId, setEditingDescId] = useState(null)
+  const [editingDescText, setEditingDescText] = useState('')
+  const descInputRef = useRef(null)
+
   useEffect(() => {
     setLoading(true)
     Promise.all([listDocuments(), listDataSources()])
@@ -57,6 +65,10 @@ export default function Sidebar({ onUpload, refreshKey }) {
   useEffect(() => {
     if (editingSourceId && editSourceInputRef.current) editSourceInputRef.current.focus()
   }, [editingSourceId])
+
+  useEffect(() => {
+    if (editingDescId && descInputRef.current) descInputRef.current.focus()
+  }, [editingDescId])
 
   // Close assign dropdown on outside click
   useEffect(() => {
@@ -173,6 +185,22 @@ export default function Sidebar({ onUpload, refreshKey }) {
     setCollapsedSources(prev => ({ ...prev, [sourceId]: !prev[sourceId] }))
   }
 
+  function startEditDesc(source) {
+    setEditingDescId(source.id)
+    setEditingDescText(source.description || '')
+  }
+
+  async function handleSaveDescription(sourceId) {
+    const description = editingDescText.trim() || null
+    setEditingDescId(null)
+    try {
+      const { source } = await updateDataSourceDescription(sourceId, description)
+      setSources(prev => prev.map(s => s.id === sourceId ? source : s))
+    } catch (err) {
+      console.error(err)
+    }
+  }
+
   function DocItem({ doc }) {
     const active = docId === doc.doc_id
     return (
@@ -219,14 +247,14 @@ export default function Sidebar({ onUpload, refreshKey }) {
             </svg>
           </div>
           <div>
-            <p className="text-white font-semibold text-[15px] leading-none tracking-tight">Glaucus</p>
+            <p className="text-white font-semibold text-[15px] leading-none tracking-tight">Glaucias</p>
             <p className="text-zinc-500 text-[11px] mt-0.5">Document Intelligence</p>
           </div>
         </Link>
       </div>
 
-      {/* New Document */}
-      <div className="px-3 py-3">
+      {/* New Document + Chat */}
+      <div className="px-3 py-3 space-y-1.5">
         <button
           onClick={onUpload}
           className="w-full flex items-center gap-2 px-3 py-2.5 bg-gold-500 hover:bg-gold-400 active:bg-gold-600 text-white rounded-lg font-medium text-sm transition-all duration-150 shadow-sm shadow-gold-900/20"
@@ -234,6 +262,17 @@ export default function Sidebar({ onUpload, refreshKey }) {
           <Plus className="w-4 h-4" />
           New Document
         </button>
+        <Link
+          to="/chat"
+          className={`w-full flex items-center gap-2 px-3 py-2.5 rounded-lg font-medium text-sm transition-all duration-150 ${
+            onChatPage
+              ? 'bg-zinc-800 text-white'
+              : 'text-zinc-400 hover:bg-zinc-900 hover:text-zinc-200'
+          }`}
+        >
+          <MessageSquare className="w-4 h-4" />
+          Chat
+        </Link>
       </div>
 
       {/* Nav */}
@@ -309,6 +348,13 @@ export default function Sidebar({ onUpload, refreshKey }) {
                     )}
                     <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 flex-shrink-0">
                       <button
+                        onClick={() => startEditDesc(source)}
+                        className="p-0.5 rounded text-zinc-600 hover:text-blue-400 transition-colors"
+                        title="Edit description"
+                      >
+                        <AlignLeft className="w-3 h-3" />
+                      </button>
+                      <button
                         onClick={() => startRenameSource(source)}
                         className="p-0.5 rounded text-zinc-600 hover:text-zinc-400 transition-colors"
                         title="Rename"
@@ -324,6 +370,31 @@ export default function Sidebar({ onUpload, refreshKey }) {
                       </button>
                     </div>
                   </div>
+                  {/* Description row */}
+                  {editingDescId === source.id ? (
+                    <div className="ml-5 px-2 pb-1">
+                      <input
+                        ref={descInputRef}
+                        value={editingDescText}
+                        onChange={e => setEditingDescText(e.target.value)}
+                        onBlur={() => handleSaveDescription(source.id)}
+                        onKeyDown={e => {
+                          if (e.key === 'Enter') handleSaveDescription(source.id)
+                          if (e.key === 'Escape') setEditingDescId(null)
+                        }}
+                        placeholder="Add a description for routing…"
+                        className="w-full bg-zinc-800 text-zinc-300 text-[11px] px-1.5 py-1 rounded outline-none border border-zinc-600 placeholder-zinc-600"
+                      />
+                    </div>
+                  ) : source.description ? (
+                    <p
+                      className="ml-5 px-2 pb-1 text-[11px] text-zinc-600 truncate cursor-pointer hover:text-zinc-500"
+                      onClick={() => startEditDesc(source)}
+                      title={source.description}
+                    >
+                      {source.description}
+                    </p>
+                  ) : null}
 
                   {!isCollapsed && (
                     <div className="ml-4 space-y-0.5">
@@ -412,7 +483,7 @@ export default function Sidebar({ onUpload, refreshKey }) {
 
       {/* Footer */}
       <div className="px-5 py-4 border-t border-zinc-800/80">
-        <p className="text-zinc-600 text-[11px]">Claude · Qdrant · Docling</p>
+        <p className="text-zinc-600 text-[11px]">Glaucias @ 2026</p>
       </div>
     </aside>
   )

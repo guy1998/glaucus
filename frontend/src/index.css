@@ -73,6 +73,38 @@
   }
   .markdown-body hr { @apply border-zinc-200 my-8; }
 
+  /* Dark variant used in the chat panel */
+  .markdown-chat {
+    @apply text-zinc-200 leading-relaxed text-sm;
+  }
+  .markdown-chat h1,
+  .markdown-chat h2,
+  .markdown-chat h3 { @apply font-semibold text-white mt-4 mb-2; }
+  .markdown-chat h1 { @apply text-lg; }
+  .markdown-chat h2 { @apply text-base; }
+  .markdown-chat h3 { @apply text-sm text-gold-300; }
+  .markdown-chat p   { @apply mb-3; }
+  .markdown-chat ul  { @apply list-disc  list-outside pl-5 mb-3 space-y-1; }
+  .markdown-chat ol  { @apply list-decimal list-outside pl-5 mb-3 space-y-1; }
+  .markdown-chat li  { @apply text-zinc-300; }
+  .markdown-chat code {
+    @apply bg-zinc-800 text-gold-300 px-1.5 py-0.5 rounded text-[12px] font-mono;
+  }
+  .markdown-chat pre {
+    @apply bg-zinc-900 border border-zinc-700 text-zinc-100 p-3 rounded-lg overflow-x-auto mb-3 text-[12px];
+  }
+  .markdown-chat pre code { @apply bg-transparent text-zinc-100 p-0; }
+  .markdown-chat blockquote {
+    @apply border-l-4 border-gold-500/50 pl-3 text-zinc-400 italic my-3;
+  }
+  .markdown-chat table { @apply w-full border-collapse mb-3 text-sm; }
+  .markdown-chat th {
+    @apply border border-zinc-700 bg-zinc-800 px-3 py-1.5 text-left text-zinc-300 font-semibold text-xs;
+  }
+  .markdown-chat td { @apply border border-zinc-700 px-3 py-1.5 text-zinc-400 text-xs; }
+  .markdown-chat a  { @apply text-gold-400 hover:text-gold-300 underline transition-colors; }
+  .markdown-chat hr { @apply border-zinc-700 my-4; }
+
   /* Node highlight when navigated from JSON tree */
   .node-active {
     @apply bg-gold-50 rounded-md outline outline-2 outline-gold-300 outline-offset-2;

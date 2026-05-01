@@ -4,6 +4,7 @@ import Sidebar from './components/Sidebar'
 import UploadModal from './components/UploadModal'
 import HomePage from './pages/HomePage'
 import DocumentPage from './pages/DocumentPage'
+import ChatPage from './pages/ChatPage'
 
 export default function App() {
   const [showUpload, setShowUpload] = useState(false)
@@ -26,6 +27,7 @@ export default function App() {
           <Routes>
             <Route path="/" element={<HomePage onUpload={() => setShowUpload(true)} />} />
             <Route path="/documents/:docId" element={<DocumentPage />} />
+            <Route path="/chat" element={<ChatPage />} />
           </Routes>
         </main>
 

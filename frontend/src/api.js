@@ -99,6 +99,43 @@ export async function renameDataSource(sourceId, name) {
   return res.json()
 }
 
+export async function updateDataSourceDescription(sourceId, description) {
+  const res = await fetch(`${BASE}/data-sources/${encodeURIComponent(sourceId)}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ description }),
+  })
+  if (!res.ok) throw new Error('Failed to update description')
+  return res.json()
+}
+
+export async function* streamChat(query, dataSourceId, history = []) {
+  const res = await fetch(`${BASE}/chat/stream`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ query, data_source_id: dataSourceId, history }),
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error(err.error || 'Chat stream failed')
+  }
+  const reader = res.body.getReader()
+  const decoder = new TextDecoder()
+  let buf = ''
+  while (true) {
+    const { done, value } = await reader.read()
+    if (done) break
+    buf += decoder.decode(value, { stream: true })
+    const lines = buf.split('\n')
+    buf = lines.pop()
+    for (const line of lines) {
+      if (line.startsWith('data: ')) {
+        try { yield JSON.parse(line.slice(6)) } catch {}
+      }
+    }
+  }
+}
+
 export async function deleteDataSource(sourceId) {
   const res = await fetch(`${BASE}/data-sources/${encodeURIComponent(sourceId)}`, { method: 'DELETE' })
   if (!res.ok) throw new Error('Failed to delete data source')
