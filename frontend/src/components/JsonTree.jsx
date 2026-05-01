@@ -25,11 +25,15 @@ function preview(node) {
 // ---------------------------------------------------------------------------
 // ConnectionItem
 // ---------------------------------------------------------------------------
-function ConnectionItem({ node, edgeType, removing, onRemove }) {
+function ConnectionItem({ node, edgeType, removing, onRemove, onNavigate }) {
   const meta = getTypeMeta(node.type)
   return (
     <div className="flex items-center gap-2 px-4 py-2 border-b border-zinc-50 last:border-0 group hover:bg-zinc-50 transition-colors">
-      <div className="flex-1 min-w-0">
+      <button
+        onClick={() => onNavigate?.(node.id)}
+        className="flex-1 min-w-0 text-left"
+        title="Navigate to node"
+      >
         <div className="flex items-center gap-1.5 mb-0.5 flex-wrap">
           <span className={`px-1 py-0.5 rounded text-[9px] font-medium flex-shrink-0 ${meta.color}`}>
             {meta.label}
@@ -39,8 +43,8 @@ function ConnectionItem({ node, edgeType, removing, onRemove }) {
           )}
           <span className="text-[9px] text-zinc-300 italic">{edgeType}</span>
         </div>
-        <p className="text-[11px] text-zinc-500 truncate">{node.preview || '(empty)'}</p>
-      </div>
+        <p className="text-[11px] text-zinc-500 truncate group-hover:text-zinc-700 transition-colors">{node.preview || '(empty)'}</p>
+      </button>
       <button
         onClick={onRemove}
         disabled={removing}
@@ -59,7 +63,7 @@ function ConnectionItem({ node, edgeType, removing, onRemove }) {
 // ---------------------------------------------------------------------------
 // ConnectionsPanel
 // ---------------------------------------------------------------------------
-function ConnectionsPanel({ docId, nodeId, nodes }) {
+function ConnectionsPanel({ docId, nodeId, nodes, onNavigate }) {
   const [data, setData]       = useState(null)
   const [busy, setBusy]       = useState(false)
   const [addOpen, setAddOpen] = useState(false)
@@ -188,6 +192,7 @@ function ConnectionsPanel({ docId, nodeId, nodes }) {
                     edgeType={edge_type}
                     removing={removing === `${nodeId}>${node.id}`}
                     onRemove={() => doRemove(nodeId, node.id)}
+                    onNavigate={onNavigate}
                   />
                 ))}
               </div>
@@ -204,6 +209,7 @@ function ConnectionsPanel({ docId, nodeId, nodes }) {
                     edgeType={edge_type}
                     removing={removing === `${node.id}>${nodeId}`}
                     onRemove={() => doRemove(node.id, nodeId)}
+                    onNavigate={onNavigate}
                   />
                 ))}
               </div>
@@ -276,7 +282,7 @@ function PageGroup({ page, nodes, activeNodeId, onNodeClick }) {
 // ---------------------------------------------------------------------------
 // JsonTree
 // ---------------------------------------------------------------------------
-export default function JsonTree({ docId, nodes, activeNodeId, onNodeClick }) {
+export default function JsonTree({ docId, nodes, activeNodeId, onNodeClick, onConnectionNavigate }) {
   const [search, setSearch] = useState('')
 
   const grouped = useMemo(() => {
@@ -350,6 +356,7 @@ export default function JsonTree({ docId, nodes, activeNodeId, onNodeClick }) {
           docId={docId}
           nodeId={activeNodeId}
           nodes={nodes}
+          onNavigate={onConnectionNavigate}
         />
       )}
     </div>

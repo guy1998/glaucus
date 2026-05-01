@@ -11,7 +11,7 @@ function rewriteImageSrcs(md) {
   return md.replace(/src="images\//g, `src="${API_IMAGES}/`)
 }
 
-export default function MarkdownPane({ markdown, activeNodeId }) {
+export default function MarkdownPane({ markdown, activeNodeId, scrollToNodeId }) {
   const containerRef = useRef(null)
 
   useEffect(() => {
@@ -25,6 +25,12 @@ export default function MarkdownPane({ markdown, activeNodeId }) {
       el.scrollIntoView({ behavior: 'smooth', block: 'center' })
     }
   }, [activeNodeId])
+
+  useEffect(() => {
+    if (!scrollToNodeId || !containerRef.current) return
+    const el = containerRef.current.querySelector(`[id="${CSS.escape(scrollToNodeId)}"]`)
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  }, [scrollToNodeId])
 
   const components = {
     img({ src, alt, ...props }) {

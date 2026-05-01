@@ -12,6 +12,7 @@ export default function DocumentPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [activeNodeId, setActiveNodeId] = useState(null)
+  const [scrollNodeId, setScrollNodeId] = useState(null)
   const [queryOpen, setQueryOpen] = useState(false)
   const [treeOpen, setTreeOpen] = useState(true)
 
@@ -94,6 +95,7 @@ export default function DocumentPage() {
           <MarkdownPane
             markdown={doc?.markdown}
             activeNodeId={activeNodeId}
+            scrollToNodeId={scrollNodeId}
           />
         </div>
 
@@ -105,6 +107,7 @@ export default function DocumentPage() {
               nodes={doc?.nodes}
               activeNodeId={activeNodeId}
               onNodeClick={handleNodeClick}
+              onConnectionNavigate={setScrollNodeId}
             />
           </div>
         )}
