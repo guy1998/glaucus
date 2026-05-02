@@ -1,5 +1,5 @@
-import { useState, useMemo, useEffect, useCallback } from 'react'
-import { ChevronRight, ChevronDown, Image, Table, List, Type, AlignLeft, Heading, Plus, X, Loader2 } from 'lucide-react'
+import { useState, useMemo, useEffect, useCallback, useRef } from 'react'
+import { ChevronRight, ChevronDown, Image, Table, List, Type, AlignLeft, Heading, Plus, X, Loader2, Braces } from 'lucide-react'
 import { getNodeConnections, addEdge, removeEdge } from '../api'
 
 const TYPE_META = {
@@ -222,10 +222,55 @@ function ConnectionsPanel({ docId, nodeId, nodes, onNavigate }) {
 }
 
 // ---------------------------------------------------------------------------
+// NodeJsonModal
+// ---------------------------------------------------------------------------
+function NodeJsonModal({ node, onClose }) {
+  useEffect(() => {
+    function onKey(e) { if (e.key === 'Escape') onClose() }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onClose])
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm"
+      onClick={onClose}
+    >
+      <div
+        className="bg-white rounded-xl shadow-2xl w-full max-w-lg max-h-[75vh] flex flex-col"
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-200 flex-shrink-0">
+          <div className="flex items-center gap-2">
+            <Braces className="w-4 h-4 text-zinc-400" />
+            <span className="text-sm font-semibold text-zinc-700">Node JSON</span>
+            <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${getTypeMeta(node.type).color}`}>
+              {getTypeMeta(node.type).label}
+            </span>
+          </div>
+          <button onClick={onClose} className="p-1 rounded text-zinc-400 hover:text-zinc-600 transition-colors">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+        <div className="flex-1 overflow-auto p-4">
+          <pre className="text-xs font-mono text-zinc-700 whitespace-pre-wrap break-all">
+            {JSON.stringify(node, null, 2)}
+          </pre>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
 // PageGroup
 // ---------------------------------------------------------------------------
-function PageGroup({ page, nodes, activeNodeId, onNodeClick }) {
+function PageGroup({ page, nodes, activeNodeId, onNodeClick, onViewJson }) {
   const [open, setOpen] = useState(page <= 2)
+
+  useEffect(() => {
+    if (activeNodeId && nodes.some(n => n.id === activeNodeId)) setOpen(true)
+  }, [activeNodeId, nodes])
 
   return (
     <div className="border-b border-zinc-100 last:border-0">
@@ -250,27 +295,39 @@ function PageGroup({ page, nodes, activeNodeId, onNodeClick }) {
             const Icon = meta.Icon
             const active = activeNodeId === node.id
             return (
-              <button
+              <div
                 key={node.id}
-                onClick={() => onNodeClick(node.id)}
-                className={`w-full flex items-start gap-2.5 px-4 py-2.5 text-left transition-all duration-150 border-l-2 ${
+                data-node-id={node.id}
+                className={`flex items-start gap-2.5 px-4 py-2.5 transition-all duration-150 border-l-2 group ${
                   active
                     ? 'bg-gold-50 border-gold-400'
                     : 'border-transparent hover:bg-zinc-50 hover:border-zinc-200'
                 }`}
               >
-                <Icon className={`w-3.5 h-3.5 mt-0.5 flex-shrink-0 ${active ? 'text-gold-500' : 'text-zinc-400'}`} />
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-1.5 mb-1">
-                    <span className={`inline-flex px-1.5 py-0.5 rounded text-[10px] font-medium ${meta.color}`}>
-                      {meta.label}
-                    </span>
+                <button
+                  onClick={() => onNodeClick(node.id)}
+                  className="flex items-start gap-2.5 flex-1 min-w-0 text-left"
+                >
+                  <Icon className={`w-3.5 h-3.5 mt-0.5 flex-shrink-0 ${active ? 'text-gold-500' : 'text-zinc-400'}`} />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-1.5 mb-1">
+                      <span className={`inline-flex px-1.5 py-0.5 rounded text-[10px] font-medium ${meta.color}`}>
+                        {meta.label}
+                      </span>
+                    </div>
+                    <p className="text-[12px] text-zinc-600 leading-snug line-clamp-2">
+                      {preview(node) || <span className="text-zinc-300 italic">empty</span>}
+                    </p>
                   </div>
-                  <p className="text-[12px] text-zinc-600 leading-snug line-clamp-2">
-                    {preview(node) || <span className="text-zinc-300 italic">empty</span>}
-                  </p>
-                </div>
-              </button>
+                </button>
+                <button
+                  onClick={() => onViewJson(node)}
+                  title="View JSON"
+                  className="opacity-0 group-hover:opacity-100 flex-shrink-0 p-0.5 mt-0.5 rounded text-zinc-300 hover:text-zinc-600 transition-all"
+                >
+                  <Braces className="w-3.5 h-3.5" />
+                </button>
+              </div>
             )
           })}
         </div>
@@ -284,6 +341,17 @@ function PageGroup({ page, nodes, activeNodeId, onNodeClick }) {
 // ---------------------------------------------------------------------------
 export default function JsonTree({ docId, nodes, activeNodeId, onNodeClick, onConnectionNavigate }) {
   const [search, setSearch] = useState('')
+  const [modalNode, setModalNode] = useState(null)
+  const listRef = useRef(null)
+
+  useEffect(() => {
+    if (!activeNodeId || !listRef.current) return
+    const timer = setTimeout(() => {
+      const el = listRef.current?.querySelector(`[data-node-id="${CSS.escape(activeNodeId)}"]`)
+      el?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+    }, 60)
+    return () => clearTimeout(timer)
+  }, [activeNodeId])
 
   const grouped = useMemo(() => {
     if (!nodes) return []
@@ -334,7 +402,7 @@ export default function JsonTree({ docId, nodes, activeNodeId, onNodeClick, onCo
       </div>
 
       {/* Node groups */}
-      <div className="flex-1 overflow-y-auto min-h-0">
+      <div ref={listRef} className="flex-1 overflow-y-auto min-h-0">
         {grouped.length === 0 ? (
           <p className="text-zinc-400 text-xs text-center p-6">No matching nodes.</p>
         ) : (
@@ -345,6 +413,7 @@ export default function JsonTree({ docId, nodes, activeNodeId, onNodeClick, onCo
               nodes={pageNodes}
               activeNodeId={activeNodeId}
               onNodeClick={onNodeClick}
+              onViewJson={setModalNode}
             />
           ))
         )}
@@ -359,6 +428,8 @@ export default function JsonTree({ docId, nodes, activeNodeId, onNodeClick, onCo
           onNavigate={onConnectionNavigate}
         />
       )}
+
+      {modalNode && <NodeJsonModal node={modalNode} onClose={() => setModalNode(null)} />}
     </div>
   )
 }

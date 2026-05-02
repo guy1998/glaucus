@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="media/glaucias_logo.png" alt="Glaucias" width="200"/>
+  <img src="media/glaucias_logo.png" alt="Glaucias" width="400" style="border-radius: 50%;" />
   <h1>Glaucias</h1>
   <p>A platform for turning PDFs into structured, searchable knowledge.</p>
 </div>

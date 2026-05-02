@@ -11,7 +11,7 @@ function rewriteImageSrcs(md) {
   return md.replace(/src="images\//g, `src="${API_IMAGES}/`)
 }
 
-export default function MarkdownPane({ markdown, activeNodeId, scrollToNodeId }) {
+export default function MarkdownPane({ markdown, activeNodeId, scrollToNodeId, onNodeClick }) {
   const containerRef = useRef(null)
 
   useEffect(() => {
@@ -31,6 +31,15 @@ export default function MarkdownPane({ markdown, activeNodeId, scrollToNodeId })
     const el = containerRef.current.querySelector(`[id="${CSS.escape(scrollToNodeId)}"]`)
     if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' })
   }, [scrollToNodeId])
+
+  function handleClick(e) {
+    if (!onNodeClick) return
+    let el = e.target
+    while (el && el !== containerRef.current) {
+      if (el.id) { onNodeClick(el.id); return }
+      el = el.parentElement
+    }
+  }
 
   const components = {
     img({ src, alt, ...props }) {
@@ -62,7 +71,7 @@ export default function MarkdownPane({ markdown, activeNodeId, scrollToNodeId })
   }
 
   return (
-    <div ref={containerRef} className="h-full overflow-y-auto">
+    <div ref={containerRef} className="h-full overflow-y-auto" onClick={handleClick}>
       <div className="max-w-3xl mx-auto px-10 py-10">
         <div className="markdown-body">
           <ReactMarkdown

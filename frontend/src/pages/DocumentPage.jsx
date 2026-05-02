@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useParams } from 'react-router-dom'
-import { Search, Loader2, AlertCircle, PanelRight, PanelRightClose } from 'lucide-react'
+import { Search, Loader2, AlertCircle, PanelRight, PanelRightClose, Download } from 'lucide-react'
 import { getDocument } from '../api'
 import MarkdownPane from '../components/MarkdownPane'
 import JsonTree from '../components/JsonTree'
@@ -31,6 +31,16 @@ export default function DocumentPage() {
 
   function handleNodeClick(nodeId) {
     setActiveNodeId(nodeId)
+  }
+
+  function downloadBlob(content, filename, mimeType) {
+    const blob = new Blob([content], { type: mimeType })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = filename
+    a.click()
+    URL.revokeObjectURL(url)
   }
 
   if (loading) {
@@ -78,6 +88,27 @@ export default function DocumentPage() {
             <span className="hidden sm:inline">Query</span>
           </button>
 
+          {doc && (
+            <>
+              <button
+                onClick={() => downloadBlob(doc.markdown, `${docId}.md`, 'text/markdown')}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium bg-zinc-100 text-zinc-600 hover:bg-zinc-200 transition-colors"
+                title="Export Markdown"
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">MD</span>
+              </button>
+              <button
+                onClick={() => downloadBlob(JSON.stringify(doc.nodes, null, 2), `${docId}.json`, 'application/json')}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium bg-zinc-100 text-zinc-600 hover:bg-zinc-200 transition-colors"
+                title="Export JSON"
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">JSON</span>
+              </button>
+            </>
+          )}
+
           <button
             onClick={() => setTreeOpen(t => !t)}
             className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-600 hover:bg-zinc-100 transition-colors"
@@ -96,6 +127,7 @@ export default function DocumentPage() {
             markdown={doc?.markdown}
             activeNodeId={activeNodeId}
             scrollToNodeId={scrollNodeId}
+            onNodeClick={handleNodeClick}
           />
         </div>
 
