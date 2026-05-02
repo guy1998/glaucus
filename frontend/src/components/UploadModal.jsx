@@ -20,8 +20,25 @@ export default function UploadModal({ onClose, onComplete }) {
   const [phase, setPhase] = useState('idle') // idle | uploading | streaming | done | error
   const [progress, setProgress] = useState({ pct: 0, step: '', message: '' })
   const [error, setError] = useState(null)
+  const [keywords, setKeywords] = useState([])
+  const [kwInput, setKwInput] = useState('')
   const fileInput = useRef(null)
   const esRef = useRef(null)
+
+  function addKeyword(raw) {
+    const kw = raw.trim().replace(/,+$/, '').trim()
+    if (kw && !keywords.includes(kw)) setKeywords(prev => [...prev, kw])
+    setKwInput('')
+  }
+
+  function onKwKeyDown(e) {
+    if (e.key === 'Enter' || e.key === ',') {
+      e.preventDefault()
+      addKeyword(kwInput)
+    } else if (e.key === 'Backspace' && !kwInput && keywords.length > 0) {
+      setKeywords(prev => prev.slice(0, -1))
+    }
+  }
 
   useEffect(() => () => esRef.current?.close(), [])
 
@@ -38,10 +55,11 @@ export default function UploadModal({ onClose, onComplete }) {
 
   async function handleUpload() {
     if (!file) return
+    const finalKeywords = kwInput.trim() ? [...keywords, kwInput.trim()] : keywords
     setPhase('uploading')
     setError(null)
     try {
-      const { job_id } = await uploadDocument(file)
+      const { job_id } = await uploadDocument(file, finalKeywords)
       setPhase('streaming')
       const es = openStream(job_id)
       esRef.current = es
@@ -149,6 +167,39 @@ export default function UploadModal({ onClose, onComplete }) {
                   </div>
                 </>
               )}
+            </div>
+          )}
+
+          {/* Custom reference keywords */}
+          {(phase === 'idle' || phase === 'error') && (
+            <div className="mt-4">
+              <label className="block text-xs font-medium text-zinc-500 mb-1.5">
+                Custom reference keywords
+                <span className="font-normal text-zinc-400 ml-1">(optional — press Enter or , to add)</span>
+              </label>
+              <div className="flex flex-wrap gap-1.5 p-2.5 rounded-xl border border-zinc-200 bg-zinc-50 min-h-[40px] focus-within:border-gold-300 focus-within:bg-white transition-colors">
+                {keywords.map(kw => (
+                  <span key={kw} className="flex items-center gap-1 px-2 py-0.5 bg-gold-100 text-gold-700 rounded-full text-xs font-medium">
+                    {kw}
+                    <button
+                      type="button"
+                      onClick={() => setKeywords(prev => prev.filter(k => k !== kw))}
+                      className="text-gold-500 hover:text-gold-700 leading-none"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </span>
+                ))}
+                <input
+                  type="text"
+                  value={kwInput}
+                  onChange={e => setKwInput(e.target.value)}
+                  onKeyDown={onKwKeyDown}
+                  onBlur={() => kwInput.trim() && addKeyword(kwInput)}
+                  placeholder={keywords.length === 0 ? 'e.g. per the methodology, as noted earlier' : ''}
+                  className="flex-1 min-w-[120px] bg-transparent text-xs text-zinc-700 placeholder-zinc-300 outline-none"
+                />
+              </div>
             </div>
           )}
 

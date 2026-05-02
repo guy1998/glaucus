@@ -54,12 +54,16 @@ After extraction, Glaucias goes through the document and finds references betwee
 
 **Implicit** references are things like "as mentioned above" or "the following example". These are resolved by an LLM that reads the context and figures out what is being pointed to.
 
+**Custom keywords** can be provided at upload time to catch author-specific phrasing that the built-in patterns would miss — things like "per the methodology" or "as noted earlier". Any node containing a custom keyword is treated the same as an implicit reference and sent to the LLM for target resolution.
+
 ```mermaid
 flowchart TD
     A[Document Nodes] --> B[Explicit Detection]
     A --> C[Implicit Detection]
+    A --> K[Custom Keywords]
     B --> D["Regex patterns\nFigure X, Table Y, Section Z"]
     C --> E["LLM resolution\nanaphoric + positional references"]
+    K --> E
     D & E --> F[Reference Edges]
     F --> G[Knowledge Graph]
 ```

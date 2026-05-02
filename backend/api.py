@@ -143,6 +143,7 @@ def _run_pipeline(
     tmp_path: str,
     original_filename: str,
     q: "queue.Queue[dict]",
+    custom_keywords: list[str] | None = None,
 ) -> None:
 
     def emit(pct: int, message: str, step: str = "") -> None:
@@ -198,7 +199,7 @@ def _run_pipeline(
             pct = 52 + int(16 * done / total) if total else 52
             emit(pct, msg, "graph")
 
-        edges = build_reference_edges(all_nodes, progress_fn=_graph_progress)
+        edges = build_reference_edges(all_nodes, progress_fn=_graph_progress, custom_keywords=custom_keywords or [])
         save_graph(edges, nodes_json)
         emit(70, f"Reference graph complete — {len(edges)} edge(s) resolved", "graph")
 
@@ -267,6 +268,9 @@ def upload():
     f.save(tmp.name)
     tmp.close()
 
+    raw_kw = (request.form.get('keywords') or '').strip()
+    custom_keywords = [k.strip() for k in raw_kw.split(',') if k.strip()] if raw_kw else []
+
     job_id: str              = str(uuid.uuid4())
     q: "queue.Queue[dict]"   = queue.Queue()
 
@@ -283,6 +287,7 @@ def upload():
     threading.Thread(
         target=_run_pipeline,
         args=(job_id, tmp.name, f.filename, q),
+        kwargs={"custom_keywords": custom_keywords},
         daemon=True,
     ).start()
 

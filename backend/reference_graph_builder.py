@@ -222,14 +222,16 @@ def build_title_index(nodes: list[dict]) -> dict[str, str]:
 # Step 2 — Regex pre-filter
 # ---------------------------------------------------------------------------
 
-def has_potential_reference(node: dict) -> bool:
+def has_potential_reference(node: dict, custom_re=None) -> bool:
     text = _get_node_text(node)
     if len(text) < MIN_TEXT_LEN:
         return False
-    return bool(_ANY_REF_RE.search(text))
+    if _ANY_REF_RE.search(text):
+        return True
+    return bool(custom_re and custom_re.search(text))
 
 
-def classify_references(text: str) -> dict[str, list[str]]:
+def classify_references(text: str, custom_re=None) -> dict[str, list[str]]:
     """
     Returns detected reference categories in the text.
     Each value is a list of the matched targets (numbers or title fragments).
@@ -241,6 +243,7 @@ def classify_references(text: str) -> dict[str, list[str]]:
         'figure':   [m.group(1) for m in _FIGURE_REF_RE.finditer(text)],
         'page':     [m.group(1) for m in _PAGE_REF_RE.finditer(text)],
         'named':    [m.group(1).strip() for m in _NAMED_REF_RE.finditer(text)],
+        'custom':   [m.group(0) for m in custom_re.finditer(text)] if custom_re else [],
     }
 
 
@@ -554,7 +557,17 @@ def build_page_index(nodes: list[dict]) -> dict[int, list[str]]:
 # Step 6 — Main edge builder
 # ---------------------------------------------------------------------------
 
-def build_reference_edges(nodes: list[dict], progress_fn=None) -> list[dict]:
+def build_reference_edges(
+    nodes: list[dict],
+    progress_fn=None,
+    custom_keywords: list[str] | None = None,
+) -> list[dict]:
+    custom_re = None
+    if custom_keywords:
+        parts = [re.escape(k.strip()) for k in custom_keywords if k.strip()]
+        if parts:
+            custom_re = re.compile('|'.join(parts), re.IGNORECASE)
+
     node_map: dict[str, dict] = {n['id']: n for n in nodes}
     title_index = build_title_index(nodes)
     page_index = build_page_index(nodes)
@@ -577,15 +590,16 @@ def build_reference_edges(nodes: list[dict], progress_fn=None) -> list[dict]:
         if progress_fn is not None and i % 25 == 0:
             progress_fn(i, len(nodes), f"Scanning references {i}/{len(nodes)} nodes…")
         # --- Pre-filter ---
-        if not has_potential_reference(node):
+        if not has_potential_reference(node, custom_re):
             continue
 
         source_id = node['id']
         text = _get_node_text(node)
-        detected = classify_references(text)
+        detected = classify_references(text, custom_re)
         detected['named'].extend(find_bare_title_refs(text, title_index))
 
-        has_implicit = bool(detected['implicit'])
+        implicit_keywords = detected['implicit'] + detected['custom']
+        has_implicit = bool(implicit_keywords)
         has_explicit = any(
             detected[k] for k in ('section', 'table', 'figure', 'page', 'named')
         )
@@ -651,7 +665,7 @@ def build_reference_edges(nodes: list[dict], progress_fn=None) -> list[dict]:
             }
 
             llm_ids = resolve_implicit_refs_with_llm(
-                node, detected['implicit'], positional_windows, doc_order_window
+                node, implicit_keywords, positional_windows, doc_order_window
             )
             for tid in llm_ids:
                 _add_edge(source_id, tid, 'implicit')
@@ -684,7 +698,7 @@ def process_document(input_file: str) -> None:
     title_index = build_title_index(nodes)
     print(f'Title index: {len(title_index)} keys')
 
-    candidates = [n for n in nodes if has_potential_reference(n)]
+    candidates = [n for n in nodes if has_potential_reference(n, None)]
     print(f'Nodes with potential references: {len(candidates)} / {len(nodes)}')
     for n in candidates[:10]:
         print(f'  [{n["id"]}] {_get_node_text(n)[:80]}')

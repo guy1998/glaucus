@@ -12,9 +12,10 @@ export async function getDocument(docId) {
   return res.json()
 }
 
-export async function uploadDocument(file) {
+export async function uploadDocument(file, keywords = []) {
   const form = new FormData()
   form.append('file', file)
+  if (keywords.length > 0) form.append('keywords', keywords.join(','))
   const res = await fetch(`${BASE}/documents/upload`, { method: 'POST', body: form })
   if (!res.ok) {
     const err = await res.json().catch(() => ({}))
