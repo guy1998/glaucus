@@ -110,4 +110,11 @@
     @apply bg-gold-50 rounded-md outline outline-2 outline-gold-300 outline-offset-2;
     transition: background 0.4s ease, outline-color 0.4s ease;
   }
+
+  /* Node hover highlight in markdown pane */
+  .node-hover {
+    @apply bg-amber-50 rounded-sm;
+    cursor: pointer;
+    transition: background-color 0.1s ease;
+  }
 }

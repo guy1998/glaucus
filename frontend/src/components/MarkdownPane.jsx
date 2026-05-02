@@ -13,6 +13,46 @@ function rewriteImageSrcs(md) {
 
 export default function MarkdownPane({ markdown, activeNodeId, scrollToNodeId, onNodeClick }) {
   const containerRef = useRef(null)
+  const hoveredEls = useRef([])
+
+  function getMarkdownBody() {
+    return containerRef.current?.querySelector('.markdown-body') ?? null
+  }
+
+  function clearHover() {
+    hoveredEls.current.forEach(el => el.classList.remove('node-hover'))
+    hoveredEls.current = []
+  }
+
+  function handleMouseOver(e) {
+    const body = getMarkdownBody()
+    if (!body) return
+
+    // Walk up to find the direct child of .markdown-body
+    let el = e.target
+    while (el && el.parentElement !== body) el = el.parentElement
+    clearHover()
+    if (!el || el === body) return
+
+    // Find the anchor span that precedes this element (or is this element)
+    let anchor = (el.tagName === 'SPAN' && el.id) ? el : null
+    if (!anchor) {
+      let sib = el.previousElementSibling
+      while (sib) {
+        if (sib.tagName === 'SPAN' && sib.id) { anchor = sib; break }
+        sib = sib.previousElementSibling
+      }
+    }
+    if (!anchor) return
+
+    // Highlight every sibling between this anchor and the next anchor span
+    let cur = anchor.nextElementSibling
+    while (cur && !(cur.tagName === 'SPAN' && cur.id)) {
+      cur.classList.add('node-hover')
+      hoveredEls.current.push(cur)
+      cur = cur.nextElementSibling
+    }
+  }
 
   useEffect(() => {
     if (!activeNodeId || !containerRef.current) return
@@ -34,11 +74,18 @@ export default function MarkdownPane({ markdown, activeNodeId, scrollToNodeId, o
 
   function handleClick(e) {
     if (!onNodeClick) return
-    let el = e.target
-    while (el && el !== containerRef.current) {
-      if (el.id) { onNodeClick(el.id); return }
-      el = el.parentElement
+    // Node anchors are empty <span id="..."> siblings placed *before* content,
+    // not ancestors — so we find the span whose top edge is nearest above the click.
+    const anchors = [...containerRef.current.querySelectorAll('span[id]')]
+    if (!anchors.length) return
+    const clickY = e.clientY
+    let best = null
+    let bestDist = Infinity
+    for (const a of anchors) {
+      const dist = clickY - a.getBoundingClientRect().top
+      if (dist >= 0 && dist < bestDist) { bestDist = dist; best = a }
     }
+    if (best) onNodeClick(best.id)
   }
 
   const components = {
@@ -71,7 +118,7 @@ export default function MarkdownPane({ markdown, activeNodeId, scrollToNodeId, o
   }
 
   return (
-    <div ref={containerRef} className="h-full overflow-y-auto" onClick={handleClick}>
+    <div ref={containerRef} className="h-full overflow-y-auto" onClick={handleClick} onMouseOver={handleMouseOver} onMouseLeave={clearHover}>
       <div className="max-w-3xl mx-auto px-10 py-10">
         <div className="markdown-body">
           <ReactMarkdown

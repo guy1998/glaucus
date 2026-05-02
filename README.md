@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="media/glaucias_logo.png" alt="Glaucias" width="400" style="border-radius: 50%;" />
+  <img src="media/glaucias_logo.png" alt="Glaucias" width="400" />
   <h1>Glaucias</h1>
   <p>A platform for turning PDFs into structured, searchable knowledge.</p>
 </div>
@@ -40,7 +40,8 @@ flowchart TD
     C --> E[Tables]
     C --> F[Figures & Images]
     D & E & F --> G[Structured JSON]
-    G --> H[Stored in Qdrant]
+    G --> H[Content is embedded]
+    h --> I[Stored in Qdrant]
 ```
 
 ---
