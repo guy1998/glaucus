@@ -4,12 +4,13 @@ import { Link, useParams, useNavigate, useLocation } from 'react-router-dom'
 import {
   FileText, Plus, Trash2, Loader2, Pencil, Check, X,
   FolderOpen, Folder, ChevronRight, ChevronDown, FolderInput,
-  MessageSquare, AlignLeft,
+  MessageSquare, AlignLeft, Zap,
 } from 'lucide-react'
 import {
   listDocuments, deleteDocument,
   listDataSources, createDataSource, renameDataSource,
   deleteDataSource, assignDocToDataSource, updateDataSourceDescription,
+  embedDocumentAsync, openStream,
 } from '../api'
 
 export default function Sidebar({ onUpload, refreshKey }) {
@@ -23,6 +24,7 @@ export default function Sidebar({ onUpload, refreshKey }) {
   const [assignments, setAssignments] = useState({})
   const [loading, setLoading] = useState(true)
   const [deletingId, setDeletingId] = useState(null)
+  const [embeddingIds, setEmbeddingIds] = useState(new Set())
 
   // New source creation
   const [creatingSource, setCreatingSource] = useState(false)
@@ -106,6 +108,32 @@ export default function Sidebar({ onUpload, refreshKey }) {
       console.error(err)
     } finally {
       setDeletingId(null)
+    }
+  }
+
+  async function handleEmbedDoc(docId, e) {
+    e.preventDefault()
+    e.stopPropagation()
+    setEmbeddingIds(prev => new Set([...prev, docId]))
+    try {
+      const { job_id } = await embedDocumentAsync(docId)
+      await new Promise((resolve, reject) => {
+        const es = openStream(job_id)
+        es.onmessage = ev => {
+          const event = JSON.parse(ev.data)
+          if (event.type === 'complete') { es.close(); resolve() }
+          if (event.type === 'error') { es.close(); reject(new Error(event.message)) }
+        }
+        es.onerror = () => { es.close(); reject(new Error('Stream failed')) }
+      })
+      const [docsData, sourcesData] = await Promise.all([listDocuments(), listDataSources()])
+      setDocs(docsData.documents ?? [])
+      setSources(sourcesData.sources ?? [])
+      setAssignments(sourcesData.assignments ?? {})
+    } catch (err) {
+      console.error('Embed failed:', err)
+    } finally {
+      setEmbeddingIds(prev => { const next = new Set(prev); next.delete(docId); return next })
     }
   }
 
@@ -204,6 +232,7 @@ export default function Sidebar({ onUpload, refreshKey }) {
 
   function DocItem({ doc }) {
     const active = docId === doc.doc_id
+    const isEmbedding = embeddingIds.has(doc.doc_id)
     return (
       <Link
         to={`/documents/${doc.doc_id}`}
@@ -211,9 +240,23 @@ export default function Sidebar({ onUpload, refreshKey }) {
           active ? 'bg-zinc-800 text-white' : 'text-zinc-400 hover:bg-zinc-900 hover:text-zinc-200'
         }`}
       >
-        <FileText className={`w-3.5 h-3.5 flex-shrink-0 ${active ? 'text-gold-400' : 'text-zinc-600 group-hover:text-zinc-500'}`} />
+        {isEmbedding
+          ? <Loader2 className="w-3.5 h-3.5 flex-shrink-0 text-amber-400 animate-spin" />
+          : <FileText className={`w-3.5 h-3.5 flex-shrink-0 ${
+              active ? 'text-gold-400' : doc.embedded ? 'text-zinc-600 group-hover:text-zinc-500' : 'text-amber-500/70'
+            }`} />
+        }
         <span className="flex-1 text-[12px] truncate">{doc.doc_id}</span>
         <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100">
+          {!doc.embedded && !isEmbedding && (
+            <button
+              onClick={e => handleEmbedDoc(doc.doc_id, e)}
+              className="p-0.5 rounded text-amber-500/70 hover:text-amber-400 transition-colors"
+              title="Embed for search"
+            >
+              <Zap className="w-3 h-3" />
+            </button>
+          )}
           <button
             onClick={e => openAssignDropdown(doc.doc_id, e)}
             className="p-0.5 rounded text-zinc-600 hover:text-blue-400 transition-colors"

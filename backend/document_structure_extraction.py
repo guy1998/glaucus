@@ -319,16 +319,14 @@ def generate_markdown(nodes: list[dict], doc_name: str = "") -> str:
     return "\n\n".join(parts)
 
 
-def save_document(doc_nodes, original_file):
-    file_id = Path(original_file).stem
-    output_file = OUTPUT_DIR / f"{file_id}.json"
+def save_document(doc_nodes, doc_id: str):
+    output_file = OUTPUT_DIR / f"{doc_id}.json"
     with open(output_file, "w", encoding="utf-8") as f:
         json.dump(doc_nodes, f, indent=2)
 
 
-def save_markdown(md_content: str, original_file):
-    file_id = Path(original_file).stem
-    output_file = OUTPUT_DIR / f"{file_id}.md"
+def save_markdown(md_content: str, doc_id: str):
+    output_file = OUTPUT_DIR / f"{doc_id}.md"
     with open(output_file, "w", encoding="utf-8") as f:
         f.write(md_content)
 
@@ -359,7 +357,7 @@ if __name__ == "__main__":
     finally:
         shutil.rmtree(tmp_dir, ignore_errors=True)
 
-    save_document(all_nodes, input_path)
+    save_document(all_nodes, doc_name)
     md_content = generate_markdown(all_nodes)
-    save_markdown(md_content, input_path)
+    save_markdown(md_content, doc_name)
     print(f"Done. {len(all_nodes)} total nodes saved. JSON + Markdown written to {OUTPUT_DIR}.")

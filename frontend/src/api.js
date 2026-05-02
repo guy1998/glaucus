@@ -65,6 +65,15 @@ export async function removeEdge(docId, source, target) {
   return res.json()
 }
 
+export async function embedDocumentAsync(docId) {
+  const res = await fetch(`${BASE}/documents/${encodeURIComponent(docId)}/embed`, { method: 'POST' })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error(err.error || 'Embed failed')
+  }
+  return res.json()
+}
+
 export function openStream(jobId) {
   return new EventSource(`${BASE}/documents/stream/${jobId}`)
 }

@@ -327,14 +327,22 @@ def stream(job_id: str):
 def list_documents():
     try:
         cols = _qdrant().get_collections().collections
+        embedded_ids = {c.name.removeprefix("doc_") for c in cols if c.name.startswith("doc_")}
     except Exception:
-        cols = []
+        embedded_ids = set()
 
-    docs = [
-        {"doc_id": c.name.removeprefix("doc_"), "collection": c.name}
-        for c in cols
-        if c.name.startswith("doc_")
-    ]
+    docs = []
+    if OUTPUT_DIR.exists():
+        for json_file in sorted(OUTPUT_DIR.glob("*.json")):
+            if json_file.stem.endswith("_graph"):
+                continue
+            doc_id = json_file.stem
+            docs.append({
+                "doc_id":   doc_id,
+                "collection": f"doc_{doc_id}" if doc_id in embedded_ids else None,
+                "embedded": doc_id in embedded_ids,
+            })
+
     return jsonify({"documents": docs})
 
 
@@ -346,7 +354,12 @@ def get_document(doc_id: str):
     if markdown is None or nodes is None:
         return jsonify({"error": f"document '{doc_id}' not found — upload it first"}), 404
 
-    return jsonify({"doc_id": doc_id, "markdown": markdown, "nodes": nodes})
+    try:
+        embedded = _qdrant().collection_exists(f"doc_{doc_id}")
+    except Exception:
+        embedded = False
+
+    return jsonify({"doc_id": doc_id, "markdown": markdown, "nodes": nodes, "embedded": embedded})
 
 
 @app.get("/documents/<doc_id>/nodes/<node_id>/source")
@@ -471,15 +484,75 @@ def remove_edge(doc_id: str):
     return jsonify({"removed": {"source": source, "target": target}})
 
 
+@app.post("/documents/<doc_id>/embed")
+def embed_doc(doc_id: str):
+    nodes_json_path = OUTPUT_DIR / f"{doc_id}.json"
+    if not nodes_json_path.exists():
+        return jsonify({"error": f"document '{doc_id}' not found — upload it first"}), 404
+
+    collection = f"doc_{doc_id}"
+    try:
+        already = _qdrant().collection_exists(collection)
+    except Exception:
+        already = False
+    if already:
+        return jsonify({"error": f"document '{doc_id}' is already embedded"}), 409
+
+    job_id: str            = str(uuid.uuid4())
+    q: "queue.Queue[dict]" = queue.Queue()
+
+    with _jobs_lock:
+        _jobs[job_id] = {
+            "status":     "running",
+            "queue":      q,
+            "doc_id":     doc_id,
+            "collection": None,
+            "error":      None,
+            "filename":   f"{doc_id}.pdf",
+        }
+
+    def _run_embed() -> None:
+        def emit(pct: int, message: str, step: str = "") -> None:
+            q.put({"type": "progress", "pct": pct, "message": message, "step": step})
+
+        try:
+            emit(0, f"Embedding '{doc_id}'…", "embed")
+
+            def _progress(done: int, total: int, msg: str) -> None:
+                pct = int(100 * done / total) if total else 0
+                emit(pct, msg, "embed")
+
+            with _write_lock:
+                embed_document(str(nodes_json_path), progress_fn=_progress)
+
+            emit(100, f"Ready — collection '{collection}' available for queries.", "complete")
+            q.put({"type": "complete", "doc_id": doc_id, "collection": collection})
+            with _jobs_lock:
+                _jobs[job_id].update({"status": "done", "collection": collection})
+
+        except Exception as exc:
+            err = str(exc)
+            q.put({"type": "error", "message": err})
+            with _jobs_lock:
+                _jobs[job_id].update({"status": "error", "error": err})
+
+    threading.Thread(target=_run_embed, daemon=True).start()
+
+    return jsonify({"job_id": job_id, "stream_url": f"/documents/stream/{job_id}"}), 202
+
+
 @app.delete("/documents/<doc_id>")
 def delete_document(doc_id: str):
+    json_file = OUTPUT_DIR / f"{doc_id}.json"
+    if not json_file.exists():
+        return jsonify({"error": f"document '{doc_id}' not found"}), 404
+
     collection = f"doc_{doc_id}"
     client     = _qdrant()
-    if not client.collection_exists(collection):
-        return jsonify({"error": f"collection '{collection}' not found"}), 404
 
     with _write_lock:
-        client.delete_collection(collection)
+        if client.collection_exists(collection):
+            client.delete_collection(collection)
         for suffix in (".json", ".md", "_graph.json"):
             p = OUTPUT_DIR / f"{doc_id}{suffix}"
             if p.exists():

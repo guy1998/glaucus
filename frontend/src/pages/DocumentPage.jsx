@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useParams } from 'react-router-dom'
-import { Search, Loader2, AlertCircle, PanelRight, PanelRightClose, Download } from 'lucide-react'
-import { getDocument } from '../api'
+import { Search, Loader2, AlertCircle, PanelRight, PanelRightClose, Download, Zap } from 'lucide-react'
+import { getDocument, embedDocumentAsync, openStream } from '../api'
 import MarkdownPane from '../components/MarkdownPane'
 import JsonTree from '../components/JsonTree'
 import QueryPanel from '../components/QueryPanel'
@@ -15,6 +15,8 @@ export default function DocumentPage() {
   const [scrollNodeId, setScrollNodeId] = useState(null)
   const [queryOpen, setQueryOpen] = useState(false)
   const [treeOpen, setTreeOpen] = useState(true)
+  const [embedding, setEmbedding] = useState(false)
+  const [embedded, setEmbedded] = useState(null)
 
   useEffect(() => {
     setLoading(true)
@@ -22,12 +24,34 @@ export default function DocumentPage() {
     setDoc(null)
     setActiveNodeId(null)
     setQueryOpen(false)
+    setEmbedded(null)
 
     getDocument(docId)
-      .then(setDoc)
+      .then(d => { setDoc(d); setEmbedded(d.embedded) })
       .catch(err => setError(err.message))
       .finally(() => setLoading(false))
   }, [docId])
+
+  async function handleEmbed() {
+    setEmbedding(true)
+    try {
+      const { job_id } = await embedDocumentAsync(docId)
+      await new Promise((resolve, reject) => {
+        const es = openStream(job_id)
+        es.onmessage = ev => {
+          const event = JSON.parse(ev.data)
+          if (event.type === 'complete') { es.close(); resolve() }
+          if (event.type === 'error') { es.close(); reject(new Error(event.message)) }
+        }
+        es.onerror = () => { es.close(); reject(new Error('Stream failed')) }
+      })
+      setEmbedded(true)
+    } catch (err) {
+      console.error('Embed failed:', err)
+    } finally {
+      setEmbedding(false)
+    }
+  }
 
   function handleNodeClick(nodeId) {
     setActiveNodeId(nodeId)
@@ -76,17 +100,31 @@ export default function DocumentPage() {
         </div>
 
         <div className="flex items-center gap-2 flex-shrink-0">
-          <button
-            onClick={() => setQueryOpen(q => !q)}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all duration-150 ${
-              queryOpen
-                ? 'bg-gold-500 text-white shadow-sm'
-                : 'bg-zinc-100 text-zinc-600 hover:bg-gold-50 hover:text-gold-700'
-            }`}
-          >
-            <Search className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Query</span>
-          </button>
+          {embedded === false ? (
+            <button
+              onClick={handleEmbed}
+              disabled={embedding}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium bg-amber-500/10 text-amber-600 hover:bg-amber-500/20 transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {embedding
+                ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                : <Zap className="w-3.5 h-3.5" />}
+              <span className="hidden sm:inline">{embedding ? 'Embedding…' : 'Embed'}</span>
+            </button>
+          ) : (
+            <button
+              onClick={() => setQueryOpen(q => !q)}
+              disabled={embedded === null}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all duration-150 ${
+                queryOpen
+                  ? 'bg-gold-500 text-white shadow-sm'
+                  : 'bg-zinc-100 text-zinc-600 hover:bg-gold-50 hover:text-gold-700'
+              }`}
+            >
+              <Search className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Query</span>
+            </button>
+          )}
 
           {doc && (
             <>
