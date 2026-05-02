@@ -14,6 +14,7 @@ function rewriteImageSrcs(md) {
 export default function MarkdownPane({ markdown, activeNodeId, scrollToNodeId, onNodeClick }) {
   const containerRef = useRef(null)
   const hoveredEls = useRef([])
+  const lastAnchor = useRef(null)
 
   function getMarkdownBody() {
     return containerRef.current?.querySelector('.markdown-body') ?? null
@@ -22,32 +23,50 @@ export default function MarkdownPane({ markdown, activeNodeId, scrollToNodeId, o
   function clearHover() {
     hoveredEls.current.forEach(el => el.classList.remove('node-hover'))
     hoveredEls.current = []
+    lastAnchor.current = null
   }
 
   function handleMouseOver(e) {
     const body = getMarkdownBody()
     if (!body) return
 
-    // Walk up to find the direct child of .markdown-body
-    let el = e.target
-    while (el && el.parentElement !== body) el = el.parentElement
-    clearHover()
-    if (!el || el === body) return
+    // Anchors are <span id="..."> that may be wrapped in <p> by the markdown
+    // parser, so sibling traversal is unreliable. Use Y-position instead (same
+    // approach as the click handler).
+    const anchors = [...body.querySelectorAll('span[id]')]
+    if (!anchors.length) { clearHover(); return }
 
-    // Find the anchor span that precedes this element (or is this element)
-    let anchor = (el.tagName === 'SPAN' && el.id) ? el : null
-    if (!anchor) {
-      let sib = el.previousElementSibling
-      while (sib) {
-        if (sib.tagName === 'SPAN' && sib.id) { anchor = sib; break }
-        sib = sib.previousElementSibling
-      }
+    const mouseY = e.clientY
+    let best = null
+    let bestDist = Infinity
+    for (const a of anchors) {
+      const dist = mouseY - a.getBoundingClientRect().top
+      if (dist >= 0 && dist < bestDist) { bestDist = dist; best = a }
     }
-    if (!anchor) return
 
-    // Highlight every sibling between this anchor and the next anchor span
-    let cur = anchor.nextElementSibling
-    while (cur && !(cur.tagName === 'SPAN' && cur.id)) {
+    // Skip DOM update if the hovered anchor hasn't changed
+    if (best === lastAnchor.current) return
+    lastAnchor.current = best
+    clearHover()
+    if (!best) return
+
+    // Walk up from the span to its direct child of .markdown-body
+    // (it may be nested inside a <p> wrapper)
+    let top = best
+    while (top.parentElement && top.parentElement !== body) top = top.parentElement
+
+    // If the span is nested inside a wrapper (e.g. <p><span></span>text</p>),
+    // the wrapper itself holds the visible content — highlight it too.
+    if (top !== best && top.textContent.trim()) {
+      top.classList.add('node-hover')
+      hoveredEls.current.push(top)
+    }
+
+    // Highlight every following sibling until the next anchor-containing element
+    let cur = top.nextElementSibling
+    while (cur) {
+      if (cur.tagName === 'SPAN' && cur.id) break
+      if (cur.querySelector('span[id]')) break
       cur.classList.add('node-hover')
       hoveredEls.current.push(cur)
       cur = cur.nextElementSibling

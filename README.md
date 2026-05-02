@@ -41,7 +41,7 @@ flowchart TD
     C --> F[Figures & Images]
     D & E & F --> G[Structured JSON]
     G --> H[Content is embedded]
-    h --> I[Stored in Qdrant]
+    H --> I[Stored in Qdrant]
 ```
 
 ---
