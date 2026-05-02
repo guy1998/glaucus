@@ -479,7 +479,7 @@ export default function Sidebar({ onUpload, refreshKey }) {
 
       {/* Footer */}
       <div className="px-5 py-4 border-t border-zinc-800/80">
-        <p className="text-zinc-600 text-[11px]">Glaucias @ 2026</p>
+        <p className="text-zinc-600 text-[11px]">Glaucias &copy; 2026</p>
       </div>
     </aside>
   )
