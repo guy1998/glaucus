@@ -480,6 +480,10 @@ def delete_document(doc_id: str):
 
     with _write_lock:
         client.delete_collection(collection)
+        for suffix in (".json", ".md", "_graph.json"):
+            p = OUTPUT_DIR / f"{doc_id}{suffix}"
+            if p.exists():
+                p.unlink()
 
     return jsonify({"deleted": doc_id})
 
