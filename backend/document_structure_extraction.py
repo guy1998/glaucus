@@ -77,12 +77,14 @@ def generate_stable_id(doc_name: str, element_type: str, index: int):
     return f"{doc_name}_{element_type}_{index:05d}"
 
 
-def _extract_picture_knowledge(element: PictureItem, doc, node_id: str) -> dict:
+def _extract_picture_knowledge(element: PictureItem, doc, node_id: str, doc_name: str) -> dict:
     """Save image crop and pull VLM description + classification from annotations."""
     image_path = None
     img = element.get_image(doc)
     if img is not None:
-        image_file = IMAGES_DIR / f"{node_id}.png"
+        doc_images_dir = IMAGES_DIR / doc_name
+        doc_images_dir.mkdir(parents=True, exist_ok=True)
+        image_file = doc_images_dir / f"{node_id}.png"
         img.save(image_file, format="PNG")
         image_path = str(image_file)
         del img
@@ -212,7 +214,7 @@ def assign_ids(doc, doc_name: str, node_counter_start: int = 0, page_offset: int
         prov = element.prov[0] if element.prov else None
 
         picture_knowledge = (
-            _extract_picture_knowledge(element, doc, node_id)
+            _extract_picture_knowledge(element, doc, node_id, doc_name)
             if isinstance(element, PictureItem)
             else None
         )
@@ -253,7 +255,7 @@ def assign_ids(doc, doc_name: str, node_counter_start: int = 0, page_offset: int
     return structured_nodes, node_counter
 
 
-def generate_markdown(nodes: list[dict]) -> str:
+def generate_markdown(nodes: list[dict], doc_name: str = "") -> str:
     """
     Build a Markdown document from structured nodes.
     Each node is wrapped in an HTML span with its JSON id so the frontend
@@ -282,7 +284,7 @@ def generate_markdown(nodes: list[dict]) -> str:
         elif node_type == "picture":
             img_lines = [anchor]
             if picture and picture.get("image_path"):
-                rel_path = f"images/{node_id}.png"
+                rel_path = f"images/{doc_name}/{node_id}.png" if doc_name else f"images/{node_id}.png"
                 desc = picture.get("description") or ""
                 # Collapse to single line so the alt attribute and italic caption stay valid markdown
                 alt = " ".join(desc.splitlines()).replace('"', "'")

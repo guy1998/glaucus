@@ -187,7 +187,7 @@ def _run_pipeline(
         # ── 3. Save JSON + Markdown ─────────────────────────────────────────
         emit(46, "Saving structured nodes (JSON) and markdown…", "save")
         save_document(all_nodes, doc_name)
-        save_markdown(generate_markdown(all_nodes), doc_name)
+        save_markdown(generate_markdown(all_nodes, doc_name), doc_name)
         nodes_json = str(OUTPUT_DIR / f"{doc_name}.json")
         emit(50, f"Saved → {nodes_json}", "save")
 
@@ -365,7 +365,7 @@ def node_source(doc_id: str, node_id: str):
         return jsonify({"error": f"node '{node_id}' has no page metadata"}), 422
 
     page_nodes = [n for n in nodes if (n.get("metadata") or {}).get("page") == page]
-    markdown   = generate_markdown(page_nodes)
+    markdown   = generate_markdown(page_nodes, doc_id)
 
     return jsonify({
         "node_id":  node_id,
@@ -484,6 +484,7 @@ def delete_document(doc_id: str):
             p = OUTPUT_DIR / f"{doc_id}{suffix}"
             if p.exists():
                 p.unlink()
+        shutil.rmtree(IMAGES_DIR / doc_id, ignore_errors=True)
 
     return jsonify({"deleted": doc_id})
 
