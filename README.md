@@ -201,6 +201,8 @@ docker compose up -d
 
 ### Backend
 
+> Python 3.11 is recommended.
+
 ```bash
 cd backend
 pip install -r requirements.txt
