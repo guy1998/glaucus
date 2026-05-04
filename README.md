@@ -157,7 +157,7 @@ docker run -d \
   -e EMBEDDING_MODEL=openai/text-embedding-3-large \
   -v glaucias-qdrant:/app/qdrant_storage \
   -v glaucias-storage:/app/storage \
-  YOUR_REGISTRY/glaucias:latest
+  ghcr.io/guy1998/glaucias:latest
 ```
 
 Open `http://localhost:5000`.
