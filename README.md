@@ -110,25 +110,18 @@ flowchart TD
 
 ## Screenshots
 
-> TODO: Add a screenshot of the document view here
 
-<!-- ![Document View](media/screenshot_document.png) -->
+<img src="media/upload-photo.png" alt="Upload" width="100%" />
 
-> TODO: Add a screenshot of the reference graph here
+<img src="media/document-view.png" alt="Upload" width="100%" />
 
-<!-- ![Reference Graph](media/screenshot_graph.png) -->
-
-> TODO: Add a screenshot of the chat interface here
-
-<!-- ![Chat](media/screenshot_chat.png) -->
+<img src="media/chat-view.png" alt="Upload" width="100%" />
 
 ---
 
 ## Demo
 
-> TODO: Add a demo video here
-
-<!-- [![Demo](media/demo_thumbnail.png)](media/demo.mp4) -->
+<video src="media/usage_video.mp4" controls width="100%"></video>
 
 ---
 
