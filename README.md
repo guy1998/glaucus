@@ -19,7 +19,6 @@
 - [Demo](#demo)
 - [Deploy](#deploy)
   - [Docker](#docker)
-  - [Helm (Kubernetes)](#helm-kubernetes)
 - [Setup](#setup)
 - [Stack](#stack)
 
