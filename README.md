@@ -6,6 +6,22 @@
 
 ---
 
+## Table of Contents
+
+- [What is it](#what-is-it)
+- [How it works](#how-it-works)
+- [The main flows](#the-main-flows)
+  - [1. Document extraction](#1-document-extraction)
+  - [2. Reference graph](#2-reference-graph)
+  - [3. Search within a document](#3-search-within-a-document)
+  - [4. Chat across multiple documents](#4-chat-across-multiple-documents)
+- [Screenshots](#screenshots)
+- [Demo](#demo)
+- [Setup](#setup)
+- [Stack](#stack)
+
+---
+
 ## What is it
 
 Glaucias is an open source RAG platform. The core idea is that most RAG pipelines treat documents as flat chunks of text, which loses a lot of the structure that is actually in the document. Glaucias parses PDFs and keeps that structure intact, sections, subsections, tables, figures, and the references between them.
