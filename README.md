@@ -121,8 +121,7 @@ flowchart TD
 
 ## Demo
 
-<video src="media/usage_video.mp4" controls width="100%"></video>
-
+<video src="media/usage-video.mp4" controls width="100%"></video>
 ---
 
 ## Setup
