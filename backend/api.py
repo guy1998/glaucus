@@ -37,7 +37,7 @@ from pathlib import Path
 from typing import Callable
 
 from dotenv import load_dotenv
-from flask import Flask, Response, jsonify, request, send_from_directory, stream_with_context
+from flask import Blueprint, Flask, Response, jsonify, request, send_from_directory, stream_with_context
 from flask_cors import CORS
 from document_structure_extraction import (
     OUTPUT_DIR,
@@ -61,6 +61,7 @@ load_dotenv(Path(__file__).parent / ".env")
 MAX_UPLOAD_MB = int(os.environ.get("MAX_UPLOAD_MB", 200))
 
 app = Flask(__name__)
+api_bp = Blueprint('api', __name__)
 CORS(app)
 app.config["MAX_CONTENT_LENGTH"] = MAX_UPLOAD_MB * 1024 * 1024
 
@@ -239,17 +240,17 @@ def _run_pipeline(
 # Routes
 # ---------------------------------------------------------------------------
 
-@app.get("/health")
+@api_bp.get("/health")
 def health():
     return jsonify({"status": "ok"})
 
 
-@app.get("/documents/images/<path:filename>")
+@api_bp.get("/documents/images/<path:filename>")
 def serve_image(filename: str):
     return send_from_directory(str(IMAGES_DIR), filename)
 
 
-@app.post("/documents/upload")
+@api_bp.post("/documents/upload")
 def upload():
     if "file" not in request.files:
         return jsonify({"error": "missing 'file' field in multipart form-data"}), 400
@@ -297,7 +298,7 @@ def upload():
     }), 202
 
 
-@app.get("/documents/stream/<job_id>")
+@api_bp.get("/documents/stream/<job_id>")
 def stream(job_id: str):
     with _jobs_lock:
         job = _jobs.get(job_id)
@@ -328,7 +329,7 @@ def stream(job_id: str):
     )
 
 
-@app.get("/documents")
+@api_bp.get("/documents")
 def list_documents():
     try:
         cols = _qdrant().get_collections().collections
@@ -351,7 +352,7 @@ def list_documents():
     return jsonify({"documents": docs})
 
 
-@app.get("/documents/<doc_id>")
+@api_bp.get("/documents/<doc_id>")
 def get_document(doc_id: str):
     markdown = _load_doc_markdown(doc_id)
     nodes    = _load_doc_nodes(doc_id)
@@ -367,7 +368,7 @@ def get_document(doc_id: str):
     return jsonify({"doc_id": doc_id, "markdown": markdown, "nodes": nodes, "embedded": embedded})
 
 
-@app.get("/documents/<doc_id>/nodes/<node_id>/source")
+@api_bp.get("/documents/<doc_id>/nodes/<node_id>/source")
 def node_source(doc_id: str, node_id: str):
     nodes = _load_doc_nodes(doc_id)
     if nodes is None:
@@ -393,7 +394,7 @@ def node_source(doc_id: str, node_id: str):
     })
 
 
-@app.post("/documents/<doc_id>/query")
+@api_bp.post("/documents/<doc_id>/query")
 def query_document(doc_id: str):
     body    = request.get_json(force=True, silent=True) or {}
     q_text  = (body.get("query") or "").strip()
@@ -413,7 +414,7 @@ def query_document(doc_id: str):
     return jsonify({"query": q_text, "nodes": nodes, "context": context})
 
 
-@app.get("/documents/<doc_id>/nodes/<node_id>/connections")
+@api_bp.get("/documents/<doc_id>/nodes/<node_id>/connections")
 def node_connections(doc_id: str, node_id: str):
     nodes = _load_doc_nodes(doc_id)
     if nodes is None:
@@ -441,7 +442,7 @@ def node_connections(doc_id: str, node_id: str):
     return jsonify({"node_id": node_id, "outgoing": outgoing, "incoming": incoming})
 
 
-@app.post("/documents/<doc_id>/edges")
+@api_bp.post("/documents/<doc_id>/edges")
 def add_edge(doc_id: str):
     body   = request.get_json(force=True, silent=True) or {}
     source = (body.get("source") or "").strip()
@@ -467,7 +468,7 @@ def add_edge(doc_id: str):
     return jsonify({"added": {"source": source, "target": target, "type": etype}}), 201
 
 
-@app.delete("/documents/<doc_id>/edges")
+@api_bp.delete("/documents/<doc_id>/edges")
 def remove_edge(doc_id: str):
     body   = request.get_json(force=True, silent=True) or {}
     source = (body.get("source") or "").strip()
@@ -489,7 +490,7 @@ def remove_edge(doc_id: str):
     return jsonify({"removed": {"source": source, "target": target}})
 
 
-@app.post("/documents/<doc_id>/embed")
+@api_bp.post("/documents/<doc_id>/embed")
 def embed_doc(doc_id: str):
     nodes_json_path = OUTPUT_DIR / f"{doc_id}.json"
     if not nodes_json_path.exists():
@@ -546,7 +547,7 @@ def embed_doc(doc_id: str):
     return jsonify({"job_id": job_id, "stream_url": f"/documents/stream/{job_id}"}), 202
 
 
-@app.delete("/documents/<doc_id>")
+@api_bp.delete("/documents/<doc_id>")
 def delete_document(doc_id: str):
     json_file = OUTPUT_DIR / f"{doc_id}.json"
     if not json_file.exists():
@@ -571,13 +572,13 @@ def delete_document(doc_id: str):
 # Data source routes
 # ---------------------------------------------------------------------------
 
-@app.get("/data-sources")
+@api_bp.get("/data-sources")
 def list_data_sources():
     with _data_sources_lock:
         return jsonify(_load_data_sources())
 
 
-@app.post("/data-sources")
+@api_bp.post("/data-sources")
 def create_data_source():
     body = request.get_json(force=True, silent=True) or {}
     name = (body.get("name") or "").strip()
@@ -599,7 +600,7 @@ def create_data_source():
     return jsonify({"source": source}), 201
 
 
-@app.patch("/data-sources/<source_id>")
+@api_bp.patch("/data-sources/<source_id>")
 def update_data_source(source_id: str):
     body = request.get_json(force=True, silent=True) or {}
     name = (body.get("name") or "").strip() or None
@@ -623,7 +624,7 @@ def update_data_source(source_id: str):
     return jsonify({"source": source})
 
 
-@app.delete("/data-sources/<source_id>")
+@api_bp.delete("/data-sources/<source_id>")
 def delete_data_source(source_id: str):
     with _data_sources_lock:
         data = _load_data_sources()
@@ -640,7 +641,7 @@ def delete_data_source(source_id: str):
     return jsonify({"deleted": source_id})
 
 
-@app.put("/documents/<doc_id>/data-source")
+@api_bp.put("/documents/<doc_id>/data-source")
 def assign_document_data_source(doc_id: str):
     body = request.get_json(force=True, silent=True) or {}
     source_id = body.get("source_id")  # None to unassign
@@ -662,7 +663,7 @@ def assign_document_data_source(doc_id: str):
 # Chat stream route
 # ---------------------------------------------------------------------------
 
-@app.post("/chat/stream")
+@api_bp.post("/chat/stream")
 def chat_stream():
     body      = request.get_json(force=True, silent=True) or {}
     query     = (body.get("query") or "").strip()
@@ -764,8 +765,28 @@ def chat_stream():
 
 
 # ---------------------------------------------------------------------------
+# Blueprint + optional frontend static serving
+# ---------------------------------------------------------------------------
+
+app.register_blueprint(api_bp, url_prefix='/api')
+
+_frontend_dist = Path(os.environ.get("FRONTEND_DIST", ""))
+if _frontend_dist and _frontend_dist.is_dir():
+    @app.get("/")
+    def _serve_index():
+        return send_from_directory(str(_frontend_dist), "index.html")
+
+    @app.get("/<path:path>")
+    def _serve_static(path):
+        candidate = _frontend_dist / path
+        if candidate.is_file():
+            return send_from_directory(str(_frontend_dist), path)
+        return send_from_directory(str(_frontend_dist), "index.html")
+
+# ---------------------------------------------------------------------------
 # Dev entry point
 # ---------------------------------------------------------------------------
 
 if __name__ == "__main__":
-    app.run(debug=True, port=5000, threaded=True)
+    debug = os.environ.get("FLASK_DEBUG", "0") == "1"
+    app.run(debug=debug, host="0.0.0.0", port=5000, threaded=True)

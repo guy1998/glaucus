@@ -17,6 +17,9 @@
   - [4. Chat across multiple documents](#4-chat-across-multiple-documents)
 - [Screenshots](#screenshots)
 - [Demo](#demo)
+- [Deploy](#deploy)
+  - [Docker](#docker)
+  - [Helm (Kubernetes)](#helm-kubernetes)
 - [Setup](#setup)
 - [Stack](#stack)
 
@@ -138,6 +141,61 @@ flowchart TD
 ## Demo
 
 <video src="https://github.com/user-attachments/assets/bc0a6b21-1dd7-4e05-b2b8-460adff7108d" controls width="100%"></video>
+---
+
+## Deploy
+
+### Docker
+
+**Run a pre-built image:**
+
+```bash
+docker run -d \
+  --name glaucias \
+  -p 5000:5000 \
+  -e VLM_API_KEY=your_openai_key \
+  -e VLM_MODEL=gpt-4o \
+  -e EMBEDDING_MODEL=openai/text-embedding-3-large \
+  -v glaucias-qdrant:/app/qdrant_storage \
+  -v glaucias-storage:/app/storage \
+  YOUR_REGISTRY/glaucias:latest
+```
+
+Open `http://localhost:5000`.
+
+| Variable | Required | Default | Description |
+|---|---|---|---|
+| `VLM_API_KEY` | yes | — | OpenAI API key |
+| `VLM_BASE_URL` | no | — | OpenAI-compatible API base URL |
+| `VLM_MODEL` | no | `gpt-4o` | LLM model for graph building and chat |
+| `EMBEDDING_MODEL` | no | `openai/text-embedding-3-large` | Embedding model |
+| `MAX_UPLOAD_MB` | no | `200` | Max upload size in MB |
+
+**Build from source:**
+
+```bash
+docker build -t glaucias .
+
+docker run -d \
+  --name glaucias \
+  -p 5000:5000 \
+  -e VLM_API_KEY=your_openai_key \
+  -v glaucias-qdrant:/app/qdrant_storage \
+  -v glaucias-storage:/app/storage \
+  glaucias
+```
+
+**docker-compose:**
+
+```bash
+cp backend/.example.env backend/.env
+# fill in VLM_API_KEY and other values in backend/.env
+docker compose up -d
+```
+
+> The first startup can take a minute while ML models are downloaded and initialised.
+
+
 ---
 
 ## Setup

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import glaucusLogo from '../images/glaucias_logo-cropped.png'
+import glauciasLogo from '../images/glaucias_logo-cropped.png'
 import { Link, useParams, useNavigate, useLocation } from 'react-router-dom'
 import {
   FileText, Plus, Trash2, Loader2, Pencil, Check, X,
@@ -284,7 +284,7 @@ export default function Sidebar({ onUpload, refreshKey }) {
       {/* Logo */}
       <div className="px-5 py-5 border-b border-zinc-800/80">
         <Link to="/" className="flex items-center gap-3 group">
-          <img src={glaucusLogo} alt="Glaucias" className="w-8 h-8 object-contain flex-shrink-0" />
+          <img src={glauciasLogo} alt="Glaucias" className="w-8 h-8 object-contain flex-shrink-0" />
           <div>
             <p className="text-white font-semibold text-[15px] leading-none tracking-tight">Glaucias</p>
             <p className="text-zinc-500 text-[11px] mt-0.5">Document Intelligence</p>

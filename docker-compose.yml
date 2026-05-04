@@ -1,0 +1,18 @@
+services:
+  glaucias:
+    build: .
+    ports:
+      - "5000:5000"
+    env_file:
+      - backend/.env
+    environment:
+      FRONTEND_DIST: /app/frontend_dist
+      QDRANT_PATH: /app/qdrant_storage
+    volumes:
+      - glaucias-qdrant:/app/qdrant_storage
+      - glaucias-storage:/app/storage
+    restart: unless-stopped
+
+volumes:
+  glaucias-qdrant:
+  glaucias-storage:
